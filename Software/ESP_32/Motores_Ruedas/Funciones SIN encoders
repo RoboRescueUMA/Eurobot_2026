@@ -1,0 +1,113 @@
+// Funciones SIN ENCODERS y CON cinemática vectorial
+
+// --------------- PINES Y CANALES ------------------
+
+#define In1_fl // Front left wheel
+#define In2_fl
+#define PWM_PIN_fl
+#define PWM_fl 0 // Canal
+
+#define In1_fr // Front right wheel
+#define In2_fr
+#define PWM_PIN_fr
+#define PWM_fr 1 // Canal
+
+#define In1_br // Back right wheel
+#define In2_br
+#define PWM_PIN_br
+#define PWM_br 2 // Canal
+
+#define In1_bl // Back left wheel
+#define In2_bl
+#define PWM_PIN_bl
+#define PWM_bl 3 // Canal
+
+// Dimensiones del chasis
+const float ancho = 0.2; //(m)
+const float largo = 0.12; // CAMBIAR ESTO QUE ME LO HE MARCADO
+const float R = ancho/2 + largo/2;
+
+// Parámetros de movimiento
+float x = 0; // Movimiento lateral (right(+) and left (-))
+float y = 0; // Movimiento vertical (Forward(+) and Backwardws(-))
+float omega = 0; // Rotación (Counterclockwise(+) and Clockwise(-))
+
+// Parámetros PWM
+const int pwm_max = 255;
+const int frecuencia = 8000;
+const int resolucion = 8;
+
+// Parámetros para encoders?
+const int MAX_RPM = 350; // Máximo de revoluciones por minuto
+const float MAX_VEL = 6.5*2*3.141562*MAX_RPM/60; // m/s (2.38 m/s aprox)
+
+// ------------- FUNCIONES NECESARIAS ----------------
+int pwm_rueda (float v, int pwm_max)
+{
+  return (int)(fabs(v)*pwm_max);
+}
+
+// -------------- VOIDS CONTROL RUEDAS ---------------
+void wheel_forward(int pin1, int pin2, int pwm, int velocidad) {
+  digitalWrite(pin1, HIGH);
+  digitalWrite(pin2, LOW);
+  ledcWrite(pwm, velocidad);
+}
+
+void wheel_backwards(int pin1, int pin2, int pwm, int velocidad) {
+  digitalWrite(pin1, LOW);
+  digitalWrite(pin2, HIGH);
+  ledcWrite(pwm, velocidad);
+}
+
+void move_wheel (int pin1, int pin2, int pwm, int vel, float vf)
+{
+  if (vf>0){
+    wheel_forward (pin1, pin2, pwm, vel);
+  }else if (vf<0){
+    wheel_backwards(pin1, pin2, pwm, vel);
+  }else{wheel_forward (pin1, pin2, pwm, 0);}
+}
+
+// ----------- VOID MOVIMIENTO VECTORIAL -------------
+
+void move (float x, float y, float omega)
+{
+  // Valores de cada uno en metros por segundo (Para los encoders)
+  //float vy = vy*MAX_VEL;
+  //float vx = vx*MAX_VEL;
+  //float vomega = omega * (MAX_VEL/ R);
+
+  // Ecuaciones por cada rueda
+  float Vfl = y + x + omega * R;
+  float Vfr = y - x - omega * R;
+  float Vbr = y + x - omega * R; 
+  float Vbl = y - x + omega * R;
+
+  // Normalizamos (Para que ninguna rueda supere el máximo, miramos cual es la mayor y escalamos)
+  float maxV = fabs(Vfl);
+  maxV = max(maxV, fabs(Vfr));
+  maxV = max(maxV, fabs(Vbr));
+  maxV = max(maxV, fabs(Vbl));
+
+  if (maxV > 1.0) {
+    Vfl /= maxV;
+    Vfr /= maxV;
+    Vbr /= maxV;
+    Vbl /= maxV;
+  }
+
+  // Pasamos a PWM
+  int pwm_fl = pwm_rueda(Vfl, pwm_max);
+  int pwm_fr = pwm_rueda(Vfr, pwm_max);
+  int pwm_bl = pwm_rueda(Vbl, pwm_max);
+  int pwm_br = pwm_rueda(Vbr, pwm_max);
+
+  // ---- MOVEMOS LAS RUEDAS ----
+  move_wheel (In1_fl, In2_fl, PWM_fl, pwm_fl, Vfl); // Rueda frontal izquierda
+  move_wheel (In1_fr, In2_fr, PWM_fr, pwm_fr, Vfr); // Rueda frontal derecha
+  move_wheel (In1_br, In2_br, PWM_br, pwm_br, Vbr); // Rueda trasera derecha
+  move_wheel (In1_bl, In2_bl, PWM_bl, pwm_bl, Vbl); // Rueda trasera izquierda
+ 
+}
+
