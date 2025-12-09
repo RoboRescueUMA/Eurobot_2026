@@ -26,10 +26,11 @@ pip install esptool
 mkdir -p ~/ros2_ws
 cd ~/ros2_ws
 ```
-3. Descargar el agente micro-ros (dentro de ~/ros2_ws/src):
+3. Descargar el agente micro-ros (dentro de ~/ros2_ws/src) y el driver de la cámara:
 
 ```bash
 git clone -b humble [https://github.com/micro-ROS/micro_ros_setup.git](https://github.com/micro-ROS/micro_ros_setup.git)
+git clone [https://github.com/christianrauch/camera_ros.git](https://github.com/christianrauch/camera_ros.git)
 ```
 4. Descargar este repositorio (en otra carpeta fuera del ws):
 
