@@ -2,22 +2,18 @@
 
 #define In1_fl // Front left wheel
 #define In2_fl
-#define PWM_PIN_fl
 #define PWM_fl 0 // Canal
 
 #define In1_fr // Front right wheel
 #define In2_fr
-#define PWM_PIN_fr
 #define PWM_fr 1 // Canal
 
 #define In1_br // Back right wheel
 #define In2_br
-#define PWM_PIN_br
 #define PWM_br 2 // Canal
 
 #define In1_bl // Back left wheel
 #define In2_bl
-#define PWM_PIN_bl
 #define PWM_bl 3 // Canal
 
 // ====================== PINES ENCODERS ====================
@@ -118,16 +114,16 @@ int control_rueda(PID &pid, volatile long &ticks, float vel_norm, float dt)
   return constrain((int)salida, 0, pwm_max);
 }
 
-void wheel_forward(int pin1, int pin2, int pwm, int velocidad) {
+void wheel_forward(int pin1, int pin2, int velocidad) {
   digitalWrite(pin1, HIGH);
   digitalWrite(pin2, LOW);
-  ledcWrite(pwm, velocidad);
+  ledcWrite(pin1, velocidad);
 }
 
-void wheel_backwards(int pin1, int pin2, int pwm, int velocidad) {
+void wheel_backwards(int pin1, int pin2, int velocidad) {
   digitalWrite(pin1, LOW);
   digitalWrite(pin2, HIGH);
-  ledcWrite(pwm, velocidad);
+  ledcWrite(pin2, velocidad);
 }
 
 void move_wheel (int pin1, int pin2, int pwm, int vel, float vf)
