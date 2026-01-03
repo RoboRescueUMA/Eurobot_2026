@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Conversor_5V_DC")(type "KiCad")(uri "${KIPRJMOD}/Conversor_5V_DC.kicad_sym")(options "")(descr ""))
+)
