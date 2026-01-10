@@ -6,7 +6,7 @@
 
 - Inscripción de todos los miembros y firma de las autorizaciones de derechos de imagen. ⚠️ [Fecha límite: 10 de Febrero]
 
-- Pago de la inscripción. ✅  (yo me encargo)
+- Pago de la inscripción. ✅
 
 - Video y presentación (póster en Eurobot profes) de descripción técnica del robot para el jurado. ⚠️ [Fecha límite: 1 de Marzo]
 
