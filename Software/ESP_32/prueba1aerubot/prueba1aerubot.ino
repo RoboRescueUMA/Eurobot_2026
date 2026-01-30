@@ -32,7 +32,7 @@
 
 // ===================== PARAMETROS ROBOT =====================
 const float ancho = 0.2; //(m)
-const float largo = 0.153; // CAMBIAR ESTO QUE ME LO HE MARCADO
+const float largo = 0.153; //(m)
 const float R = (ancho + largo) / 2.0;
 
 // ===================== PWM =====================
@@ -56,10 +56,10 @@ struct PID { // PArámetros para corrigir errores en velocidad
   float integral; // error - prev_error
 };
 
-PID pid_fl = {1.25, 0.0, 0.05, 0, 0};
-PID pid_fr = {1.25, 0.0, 0.05, 0, 0};
-PID pid_br = {1.25, 0.0, 0.05, 0, 0};
-PID pid_bl = {1.25, 0.0, 0.05, 0, 0};
+PID pid_fl = {1.25, 0.01, 0.05, 0, 0};
+PID pid_fr = {1.25, 0.01, 0.05, 0, 0};
+PID pid_br = {1.25, 0.01, 0.05, 0, 0};
+PID pid_bl = {1.25, 0.01, 0.05, 0, 0};
 
 
 // ===================== INTERRUPCIONES ENCODERS =====================
@@ -84,7 +84,7 @@ void IRAM_ATTR enc_bl() {
 }
 
 // ===================== FUNCIONES NECESARIAS =====================
-float ticks_to_rpm  (volatile long ticks, float time)
+float ticks_to_rpm  (volatile long &ticks, float time)
 {
   noInterrupts();
   long t = ticks;
@@ -192,17 +192,16 @@ void setup() {
   pinMode(EN_FR_A, INPUT_PULLUP); pinMode(EN_FR_B, INPUT_PULLUP);
   pinMode(EN_BR_A, INPUT_PULLUP); pinMode(EN_BR_B, INPUT_PULLUP);
   pinMode(EN_BL_A, INPUT_PULLUP); pinMode(EN_BL_B, INPUT_PULLUP);
-/*
-  ledcSetup(PWM_fl, frecuencia, resolucion);
-  ledcSetup(PWM_fr, frecuencia, resolucion);
-  ledcSetup(PWM_br, frecuencia, resolucion);
-  ledcSetup(PWM_bl, frecuencia, resolucion);
 
-  ledcAttachPin(In1_fl, PWM_fl);
-  ledcAttachPin(In1_fr, PWM_fr);
-  ledcAttachPin(In1_br, PWM_br);
-  ledcAttachPin(In1_bl, PWM_bl);
-*/
+  ledcAttach(In1_fl, frecuencia, resolucion);
+  ledcAttach(In2_fl, frecuencia, resolucion);
+  ledcAttach(In1_fr, frecuencia, resolucion);
+  ledcAttach(In2_fr, frecuencia, resolucion);
+  ledcAttach(In1_br, frecuencia, resolucion);
+  ledcAttach(In2_br, frecuencia, resolucion);
+  ledcAttach(In1_bl, frecuencia, resolucion);
+  ledcAttach(In2_bl, frecuencia, resolucion);
+
   attachInterrupt(digitalPinToInterrupt(EN_FL_A), enc_fl, CHANGE);
   attachInterrupt(digitalPinToInterrupt(EN_FR_A), enc_fr, CHANGE);
   attachInterrupt(digitalPinToInterrupt(EN_BR_A), enc_br, CHANGE);
@@ -210,6 +209,10 @@ void setup() {
 
   
   
+}
+
+  Serial.begin(115200);
+  Serial.println("Robot Inicializadose...");
 }
 
 void loop(){
