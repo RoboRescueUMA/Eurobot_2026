@@ -42,6 +42,7 @@ rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
+rcl_init_options_t init_options;
 bool micro_ros_connected = false;
 unsigned long last_msg_time = 0;
 
@@ -80,10 +81,10 @@ void subscription_callback(const void * msgin) {
   float z = msg->angular.z; 
 
   // Cinemática X-Drive
-  float fl = x - y - z;
-  float fr = x + y + z;
-  float rl = x + y - z;
-  float rr = x - y + z;
+  float fl = x + y + z;
+  float fr = x - y - z;
+  float rl = x - y + z;
+  float rr = x + y - z;
 
   // Normalizar
   float max_val = max(abs(fl), max(abs(fr), max(abs(rl), abs(rr))));
@@ -123,67 +124,43 @@ void setup() {
   ledcWrite(ch_FL, 0);
   ledcWrite(ch_FR, 0);
   
+  Serial.println("✅ Hardware configurado");
   delay(500);
   
   // ============================================================
-  // TEST HARDWARE: Probar todos los motores
-  // ============================================================
-  Serial.println("\n========================================");
-  Serial.println("   TEST HARDWARE - Probando motores");
-  Serial.println("========================================");
-  
-  Serial.println("Activando FL (Frontal Izquierda)...");
-  ledcWrite(ch_FL, 200); digitalWrite(FL_DIR, HIGH);
-  delay(2000);
-  ledcWrite(ch_FL, 0); digitalWrite(FL_DIR, LOW);
-  delay(500);
-  
-  Serial.println("Activando FR (Frontal Derecha)...");
-  ledcWrite(ch_FR, 200); digitalWrite(FR_DIR, HIGH);
-  delay(2000);
-  ledcWrite(ch_FR, 0); digitalWrite(FR_DIR, LOW);
-  delay(500);
-  
-  Serial.println("Activando RL (Trasera Izquierda)...");
-  ledcWrite(ch_RL, 200); digitalWrite(RL_DIR, HIGH);
-  delay(2000);
-  ledcWrite(ch_RL, 0); digitalWrite(RL_DIR, LOW);
-  delay(500);
-  
-  Serial.println("Activando RR (Trasera Derecha)...");
-  ledcWrite(ch_RR, 200); digitalWrite(RR_DIR, HIGH);
-  delay(2000);
-  ledcWrite(ch_RR, 0); digitalWrite(RR_DIR, LOW);
-  delay(500);
-  
-  Serial.println("Activando TODOS los motores...");
-  ledcWrite(ch_FL, 200); digitalWrite(FL_DIR, HIGH);
-  ledcWrite(ch_FR, 200); digitalWrite(FR_DIR, HIGH);
-  ledcWrite(ch_RL, 200); digitalWrite(RL_DIR, HIGH);
-  ledcWrite(ch_RR, 200); digitalWrite(RR_DIR, HIGH);
-  delay(3000);
-  
-  // Parar todo
-  ledcWrite(ch_FL, 0); ledcWrite(ch_FR, 0);
-  ledcWrite(ch_RL, 0); ledcWrite(ch_RR, 0);
-  digitalWrite(FL_DIR, LOW); digitalWrite(FR_DIR, LOW);
-  digitalWrite(RL_DIR, LOW); digitalWrite(RR_DIR, LOW);
-  
-  Serial.println("========================================");
-  Serial.println("   TEST HARDWARE COMPLETADO");
-  Serial.println("========================================\n");
-  delay(1000);
+  // CONFIGURACIÓN MICRO-ROS CON DOMAIN ID Y NAMESPACE
   // ============================================================
   
   // Configurar transporte micro-ROS
   set_microros_serial_transports(Serial);
 
   // Inicialización Micro-ROS
-  Serial.println("Inicializando Micro-ROS...");
+  Serial.println("\nInicializando Micro-ROS...");
   allocator = rcl_get_default_allocator();
-  rclc_support_init(&support, 0, NULL, &allocator);
-  rclc_node_init_default(&node, "esp32_mecanum", "", &support);
   
+  // 1. Inicializar las opciones de init
+  init_options = rcl_get_zero_initialized_init_options();
+  rcl_init_options_init(&init_options, allocator);
+  
+  // 2. CONFIGURAR DOMAIN ID = 17 (igual que RPI y laptop)
+  Serial.println("📡 Configurando ROS_DOMAIN_ID = 17");
+  rcl_init_options_set_domain_id(&init_options, 17);
+  
+  // 3. Inicializar rclc_support CON las opciones configuradas
+  rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator);
+  
+  // 4. Inicializar nodo CON namespace 'roborescue'
+  const char * node_name = "esp32_mecanum";
+  const char * node_namespace = "roborescue";
+  
+  Serial.print("🤖 Inicializando nodo: ");
+  Serial.print(node_namespace);
+  Serial.print("/");
+  Serial.println(node_name);
+  
+  rclc_node_init_default(&node, node_name, node_namespace, &support);
+  
+  // 5. Suscribirse al topic /roborescue/cmd_vel
   rclc_subscription_init_default(
     &subscriber, &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
@@ -192,8 +169,13 @@ void setup() {
   rclc_executor_init(&executor, &support.context, 1, &allocator);
   rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA);
   
-  Serial.println("Micro-ROS iniciado correctamente");
-  Serial.println("Esperando comandos en /cmd_vel...\n");
+  Serial.println("========================================");
+  Serial.println("   ✅ MICRO-ROS INICIADO CORRECTAMENTE");
+  Serial.println("========================================");
+  Serial.print("   Domain ID: 17\n");
+  Serial.print("   Namespace: roborescue\n");
+  Serial.print("   Esperando en: /roborescue/cmd_vel\n");
+  Serial.println("========================================\n");
 }
 
 void loop() {

@@ -96,6 +96,9 @@ pio device monitor
 ### Desde tu portátil o RPI:
 
 ```bash
+# Importante: Configurar Domain ID 17
+export ROS_DOMAIN_ID=17
+
 # Iniciar micro-ROS agent
 ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 ```
@@ -103,14 +106,17 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 ### Probar movimiento:
 
 ```bash
-# Mover adelante
-ros2 topic pub /cmd_vel geometry_msgs/Twist "{linear: {x: 0.3, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+# IMPORTANTE: Los comandos van al namespace roborescue
+export ROS_DOMAIN_ID=17
 
-# Mover lateral (cuando tengas las Mecanum)
-ros2 topic pub /cmd_vel geometry_msgs/Twist "{linear: {x: 0.0, y: 0.3, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+# Mover adelante
+ros2 topic pub /roborescue/cmd_vel geometry_msgs/Twist "{linear: {x: 0.3, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+
+# Mover lateral (Mecanum)
+ros2 topic pub /roborescue/cmd_vel geometry_msgs/Twist "{linear: {x: 0.0, y: 0.3, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 
 # Girar
-ros2 topic pub /cmd_vel geometry_msgs/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.5}}"
+ros2 topic pub /roborescue/cmd_vel geometry_msgs/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.5}}"
 ```
 
 ---
@@ -121,8 +127,11 @@ ros2 topic pub /cmd_vel geometry_msgs/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, 
 - PWM < 20 → PWM = 0 (evita zumbidos y sobrecalentamiento)
 
 ### Nodo micro-ROS
-- Nombre del nodo: `microros_esp32_omni`
-- Suscripción: `/cmd_vel`
+- Nombre del nodo: `esp32_casa_mecanum`
+- Namespace: `roborescue`
+- Domain ID: `17`
+- Suscripción: `/roborescue/cmd_vel`
+- Watchdog: Parada automática tras 0.5s sin comandos
 
 ---
 
@@ -137,6 +146,15 @@ ros2 topic pub /cmd_vel geometry_msgs/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, 
 ---
 
 ## Historial de Cambios
+
+### 2026-02-14
+- **Actualización mayor:** Sincronización completa con esp32_roborescue
+  - ✅ Añadido Domain ID 17 (igual que RPI y Laptop)
+  - ✅ Añadido namespace "roborescue"
+  - ✅ Implementado watchdog de seguridad (0.5s timeout)
+  - ✅ Cinemática Mecanum X-Drive confirmada y documentada
+  - ✅ Nombre de nodo actualizado: `esp32_casa_mecanum`
+  - ✅ Topic actualizado: `/roborescue/cmd_vel`
 
 ### 2026-02-07
 - **Motor 3 (Frontal Derecha):** Cambiado de GPIO16/17 a GPIO18/19

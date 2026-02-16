@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Nodo relay simple para reenviar comandos cmd_vel desde laptop al ESP32
-Se suscribe a: /robot1/cmd_vel_laptop
-Publica a: /cmd_vel (para ESP32 micro-ROS)
+Se suscribe a: /roborescue/cmd_vel_laptop
+Publica a: /roborescue/cmd_vel (para ESP32 micro-ROS)
 Ejecuta en: RPI
 """
 
@@ -15,7 +15,7 @@ class CmdVelRelay(Node):
         super().__init__('cmd_vel_relay')
         
         # Declarar parámetros
-        self.declare_parameter('namespace', 'robot1')
+        self.declare_parameter('namespace', 'roborescue')
         
         # Obtener parámetros
         ns = self.get_parameter('namespace').get_parameter_value().string_value
@@ -28,10 +28,10 @@ class CmdVelRelay(Node):
             10
         )
         
-        # Publicar a topic sin namespace para ESP32 (micro-ROS no soporta namespaces bien)
-        self.publicador = self.create_publisher(Twist, '/cmd_vel', 10)
+        # Publicar a topic con namespace para ESP32 (ahora micro-ROS soporta namespaces)
+        self.publicador = self.create_publisher(Twist, f'/{ns}/cmd_vel', 10)
         
-        self.get_logger().info(f'✅ Nodo relay iniciado. Reenviando /{ns}/cmd_vel_laptop → /cmd_vel')
+        self.get_logger().info(f'✅ Nodo relay iniciado. Reenviando /{ns}/cmd_vel_laptop → /{ns}/cmd_vel')
 
     def callback_cmd_vel(self, msg):
         """Reenviar el mensaje cmd_vel recibido"""

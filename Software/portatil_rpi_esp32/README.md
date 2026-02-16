@@ -198,10 +198,10 @@ ros2 launch laptop_vision laptop_vision.launch.py \
 
 # Ver imagen con detecciones en tiempo real
 # Opción A: Video con anotaciones ArUco
-ros2 run rqt_image_view rqt_image_view /robot1/zenital/debug
+ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 
 # Opción B: Video comprimido (mejor rendimiento por WiFi)
-ros2 run rqt_image_view rqt_image_view /robot1/zenital/image_raw/compressed
+ros2 run rqt_image_view rqt_image_view /roborescue/zenital/image_raw/compressed
 ```
 
 #### En Raspberry Pi 4 (Relay + micro-ROS):
@@ -218,6 +218,48 @@ ros2 run rpi_relay cmd_vel_relay
 ```
 
 **Ver:** `docs/GUIA_VISION_DISTRIBUIDA.md` para guía detallada y configuración de ArUco markers.
+
+#### 📍 Colocación de Marcadores ArUco (IMPORTANTE)
+
+El sistema de visión detecta tanto **posición** como **orientación** de los marcadores ArUco usando la esquina 0 como referencia.
+
+**Marcadores necesarios:**
+- **ID=1** - Robot (sobre el robot móvil)
+- **ID=2** - Caja azul (objetivo)
+- **ID=3** - Caja amarilla (objetivo)
+
+**Cómo identificar la esquina 0:**
+1. Lanzar el sistema con visualización debug:
+   ```bash
+   ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
+   ```
+2. La **esquina 0** se muestra con un **círculo rojo** en la imagen
+3. Una **flecha verde/azul/amarilla** indica la orientación del marcador (desde centro → esquina 0)
+
+**Colocación correcta en el robot:**
+
+```
+        Adelante del robot
+              ↑
+              │
+    ┌─────────────────┐
+    │    ArUco ID=1   │
+    │                 │
+    │   ┌─────────┐   │
+    │   │ ● ───── │   │ ← Esquina 0 apuntando ADELANTE
+    │   │ │       │   │
+    │   │ │   1   │   │
+    │   │ └───────┘   │
+    │                 │
+    └─────────────────┘
+```
+
+**Verificación:**
+- En la imagen debug, la **flecha verde** del marcador ID=1 debe apuntar hacia **adelante del robot**
+- Si la flecha apunta en otra dirección, rotar el marcador ArUco hasta que esté correcta
+- El sistema usa esta orientación para calcular el error angular del robot
+
+**Nota:** Las cajas (ID=2, ID=3) no requieren orientación específica, solo el robot necesita tener la esquina 0 correctamente alineada.
 
 ---
 
@@ -257,12 +299,12 @@ ros2 topic list
 ros2 topic echo /cmd_vel
 
 # Ver posiciones detectadas
-ros2 topic echo /robot1/robot_pos
-ros2 topic echo /robot1/blue_box_pos
-ros2 topic echo /robot1/yellow_box_pos
+ros2 topic echo /roborescue/robot_pose
+ros2 topic echo /roborescue/blue_box_pose
+ros2 topic echo /roborescue/yellow_box_pose
 
 # Ver imágenes procesadas
-ros2 run rqt_image_view rqt_image_view /robot1/zenital/debug
+ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 ```
 
 ---
@@ -297,12 +339,12 @@ ros2 run rqt_image_view rqt_image_view /robot1/zenital/debug
 ### Flujo de Datos Completo
 
 1. **Cámara IP** (móvil con IPCamera app) → Stream video vía WiFi
-2. **Portátil** recibe stream → `camera_publisher` publica en `/robot1/zenital/image_raw`
-3. **Portátil** `aruco_detector` procesa imagen → Detecta ArUco markers (Robot ID=1, Cajas)
-4. **Portátil** `aruco_detector` calcula posiciones relativas → Publica en `/robot1/*_pos`
-5. **Portátil** `aruco_navigator` recibe posiciones → Calcula velocidades (control proporcional)
-6. **Portátil** `aruco_navigator` publica comandos → `/robot1/cmd_vel_laptop` (Twist)
-7. **RPI4** `cmd_vel_relay` reenvía → `/robot1/cmd_vel_laptop` → `/cmd_vel` (sin namespace)
+2. **Portátil** recibe stream → `camera_publisher` publica en `/roborescue/zenital/image_raw`
+3. **Portátil** `aruco_detector` procesa imagen → Detecta ArUco markers (Robot ID=1, Cajas) con posición y orientación
+4. **Portátil** `aruco_detector` calcula posiciones y orientaciones relativas → Publica en `/roborescue/*_pose` (Pose2D: x, y, theta)
+5. **Portátil** `aruco_navigator` recibe poses → Calcula velocidades usando orientación ArUco (control proporcional)
+6. **Portátil** `aruco_navigator` publica comandos → `/roborescue/cmd_vel_laptop` (Twist)
+7. **RPI4** `cmd_vel_relay` reenvía → `/roborescue/cmd_vel_laptop` → `/cmd_vel` (sin namespace)
 8. **ESP32** recibe vía micro-ROS → `/cmd_vel` (Twist)
 9. **ESP32** calcula cinemática inversa → Velocidades individuales de 4 ruedas Mecanum
 10. **ESP32** envía PWM → 4 motores DC → Robot se mueve omnidireccionalmente
@@ -310,16 +352,16 @@ ros2 run rqt_image_view rqt_image_view /robot1/zenital/debug
 ### Topics ROS2 Principales
 
 **Laptop publica:**
-- `/robot1/zenital/image_raw` - Video cámara (Image)
-- `/robot1/zenital/image_raw/compressed` - Video comprimido (CompressedImage)
-- `/robot1/zenital/debug` - Video con anotaciones ArUco (Image)
-- `/robot1/robot_pos` - Posición del robot, siempre (0, 0, 0) como referencia (Pose2D)
-- `/robot1/blue_box_pos` - Posición relativa de caja azul (Pose2D)
-- `/robot1/yellow_box_pos` - Posición relativa de caja amarilla (Pose2D)
-- `/robot1/cmd_vel_laptop` - Comandos de velocidad (Twist)
+- `/roborescue/zenital/image_raw` - Video cámara (Image)
+- `/roborescue/zenital/image_raw/compressed` - Video comprimido (CompressedImage)
+- `/roborescue/zenital/debug` - Video con anotaciones ArUco (Image)
+- `/roborescue/robot_pose` - Posición y orientación del robot, siempre (0, 0, 0) como referencia (Pose2D)
+- `/roborescue/blue_box_pose` - Posición y orientación relativa de caja azul (Pose2D)
+- `/roborescue/yellow_box_pose` - Posición y orientación relativa de caja amarilla (Pose2D)
+- `/roborescue/cmd_vel_laptop` - Comandos de velocidad (Twist)
 
 **RPI4 relay:**
-- Suscribe: `/robot1/cmd_vel_laptop` (Twist)
+- Suscribe: `/roborescue/cmd_vel_laptop` (Twist)
 - Publica: `/cmd_vel` (Twist) - Para ESP32 vía micro-ROS
 
 **ESP32 suscribe:**

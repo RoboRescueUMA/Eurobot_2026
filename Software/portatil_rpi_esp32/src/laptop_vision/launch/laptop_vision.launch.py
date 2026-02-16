@@ -13,7 +13,7 @@ def generate_launch_description():
     
     namespace_arg = DeclareLaunchArgument(
         'namespace',
-        default_value='robot1',
+        default_value='roborescue',
         description='Namespace para todos los topics'
     )
     
@@ -70,11 +70,12 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'target': target,
-            'max_linear_speed': 0.3,
-            'max_angular_speed': 1.0,
-            'linear_p_gain': 0.5,
-            'angular_p_gain': 1.5,
-            'goal_tolerance': 0.1
+            'max_linear_speed': 0.6,
+            'max_angular_speed': 0.5,
+            'linear_p_gain': 1.8,
+            'angular_p_gain': 0.3,
+            'angular_deadband_deg': 10.0,
+            'goal_tolerance': 0.15
         }]
     )
     

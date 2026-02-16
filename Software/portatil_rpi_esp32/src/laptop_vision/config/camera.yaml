@@ -3,22 +3,22 @@
 camera_publisher:
   ros__parameters:
     video_url: "http://192.168.100.122:5000/video"  # Cámara IP (móvil con app IPCamera)
-    namespace: "robot1"
+    namespace: "roborescue"
     publish_rate: 10.0  # Hz
 
 aruco_detector:
   ros__parameters:
-    namespace: "robot1"
+    namespace: "roborescue"
     robot_id: 1
     blue_box_id: 36
     yellow_box_id: 47  # TODO: Verificar este ID
 
 aruco_navigator:
   ros__parameters:
-    namespace: "robot1"
+    namespace: "roborescue"
     target: "blue_box"  # o "yellow_box"
-    max_linear_speed: 0.3
+    max_linear_speed: 0.5
     max_angular_speed: 1.0
-    linear_p_gain: 0.5
+    linear_p_gain: 0.6
     angular_p_gain: 1.5
-    goal_tolerance: 0.1  # metros
+    goal_tolerance: 0.15  # metros

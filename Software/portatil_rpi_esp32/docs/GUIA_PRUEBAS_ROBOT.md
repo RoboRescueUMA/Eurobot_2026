@@ -25,24 +25,35 @@ source install/setup.bash
 
 # Verificar nodos activos
 ros2 node list
-# Deberías ver: /microros_esp32_omni
+# Deberías ver: /roborescue/esp32_mecanum
 
 # Verificar tópicos disponibles
 ros2 topic list
-# Deberías ver: /cmd_vel, /parameter_events, /rosout
+# Deberías ver: /roborescue/cmd_vel, /parameter_events, /rosout
 
 # Ver información del tópico
-ros2 topic info /cmd_vel
+ros2 topic info /roborescue/cmd_vel
 
 # Monitorear mensajes en tiempo real (opcional)
-ros2 topic echo /cmd_vel
+ros2 topic echo /roborescue/cmd_vel
 ```
 
 ---
 
 ## 🎮 Comandos Completos de Prueba
 
+> **IMPORTANTE:** Ahora el sistema usa namespace `/roborescue/`. Existen dos formas de enviar comandos:
+> 1. **Con namespace completo**: `/roborescue/cmd_vel` (recomendado para pruebas directas)
+> 2. **Sin namespace**: `/cmd_vel` (deprecated, solo para compatibilidad)
+
 ### Prueba 0: Parar motores (SIEMPRE PRIMERO)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
@@ -50,6 +61,13 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0
 ---
 
 ### Prueba 1: Avanzar hacia adelante (100% velocidad)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
@@ -60,49 +78,97 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 1.0, y: 0.0
 ---
 
 ### Prueba 2: Retroceder (100% velocidad)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: -1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: -1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
+
 **Resultado esperado:** El robot retrocede.
 
 ---
 
 ### Prueba 3: Giro horario sobre sí mismo (100% velocidad)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 1.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 1.0}}"
 ```
+
 **Resultado esperado:** El robot gira en sentido horario sobre su eje central.
 
 ---
 
 ### Prueba 4: Giro antihorario sobre sí mismo (100% velocidad)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: -1.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: -1.0}}"
 ```
+
 **Resultado esperado:** El robot gira en sentido antihorario sobre su eje central.
 
 ---
 
 ### Prueba 5: Desplazamiento lateral derecha (Mecanum - 100%)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 1.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: 1.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
+
 **Resultado esperado:** El robot se desplaza lateralmente hacia la derecha sin cambiar orientación.
 
 ---
 
 ### Prueba 6: Desplazamiento lateral izquierda (Mecanum - 100%)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: -1.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0, y: -1.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
+
 **Resultado esperado:** El robot se desplaza lateralmente hacia la izquierda sin cambiar orientación.
 
 ---
 
 ### Prueba 7: Movimiento diagonal (adelante + derecha - 80%)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.8, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.8, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
+
 **Resultado esperado:** El robot se mueve en diagonal (45°) hacia adelante-derecha.
 
 **Nota:** Velocidad reducida a 80% en movimientos combinados para mantener el control.
@@ -110,23 +176,46 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.8
 ---
 
 ### Prueba 8: Movimiento combinado (adelante + giro - 80%)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.6}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.6}}"
 ```
+
 **Resultado esperado:** El robot avanza mientras gira (trayectoria curva).
 
 ---
 
 ### Prueba 9: Modo continuo (mantener movimiento hasta Ctrl+C)
+
+**Con namespace (recomendado):**
 ```bash
 # Quitar --once para envío continuo
+ros2 topic pub /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
+```bash
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
+
 **Nota:** Presiona `Ctrl+C` para detener el envío continuo, luego envía comando de PARAR.
 
 ---
 
 ### Prueba 10: Velocidad media (si 1.0 es muy rápido)
+
+**Con namespace (recomendado):**
+```bash
+ros2 topic pub --once /roborescue/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+```
+
+**Sin namespace (deprecated):**
 ```bash
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.8, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
@@ -301,5 +390,31 @@ Donde:
 
 ---
 
-**Última actualización:** 2026-02-07  
+## 📝 Notas de Actualización
+
+### Cambio de Namespace (2026-02-12)
+
+El sistema ha sido actualizado para usar el namespace `/roborescue/` en lugar de `/robot1/`:
+
+**Antes (deprecated):**
+- Nodo: `/microros_esp32_omni`
+- Topic: `/cmd_vel`
+
+**Ahora (actual):**
+- Nodo: `/roborescue/esp32_mecanum`
+- Topic: `/roborescue/cmd_vel`
+- ROS_DOMAIN_ID: 17 (configurado en ESP32, RPI y laptop)
+
+**Ventajas del nuevo sistema:**
+- ✅ Namespace consistente para competición multi-robot
+- ✅ Domain ID 17 configurado para evitar interferencias
+- ✅ Preparado para integración con sistema de visión
+- ✅ Soporte para futuros sensores y actuadores
+
+**Compatibilidad:**
+Los comandos antiguos sin namespace (`/cmd_vel`) siguen funcionando por compatibilidad, pero se recomienda usar el namespace completo (`/roborescue/cmd_vel`) para todas las pruebas nuevas.
+
+---
+
+**Última actualización:** 2026-02-12  
 **Autor:** Team RoboRescue

@@ -13,6 +13,9 @@ rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
+rcl_init_options_t init_options;
+bool micro_ros_connected = false;
+unsigned long last_msg_time = 0;
 
 // ==========================================
 // CONFIGURACIÓN DE PINES (DRIVER 1 - TRASERO)
@@ -102,22 +105,18 @@ void controlar_motor(int id, float speed) {
 }
 
 // ==========================================
-// CALLBACK ROS: AQUÍ HACES TUS MEZCLAS
+// CALLBACK ROS: CINEMÁTICA MECANUM X-DRIVE
 // ==========================================
 void subscription_callback(const void * msgin) {
   const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)msgin;
+  last_msg_time = millis(); // Resetear watchdog
 
   // Recogemos los inputs del mando/nav
   float x = msg->linear.x;  // Avanzar/Retroceder
-  float y = msg->linear.y;  // Desplazamiento Lateral (Strafe) -> SOLO OMNI/MECANUM
+  float y = msg->linear.y;  // Desplazamiento Lateral (Strafe) -> OMNI/MECANUM
   float z = msg->angular.z; // Giro
 
-  // ---------------------------------------------------------
-  // AQUÍ ES DONDE TÚ HACES LAS COMBINACIONES
-  // ---------------------------------------------------------
-  // Ejemplo BÁSICO (Tipo Tanque/Diferencial) - Modifícalo para Omni
-  
-  // Para ruedas Mecanum estándar (configuración X), las fórmulas son:
+  // Cinemática Mecanum X-Drive (igual que RoboRescue)
   float speed_fl = x - y - z; // Frontal Izq (Motor 2)
   float speed_fr = x + y + z; // Frontal Der (Motor 3)
   float speed_rl = x + y - z; // Trasera Izq (Motor 0)
@@ -141,17 +140,25 @@ void subscription_callback(const void * msgin) {
 
 void setup() {
   Serial.begin(115200);
-  set_microros_serial_transports(Serial); 
+  delay(1000);
   
-  // 1. Configurar Pines de Dirección (IN1, IN2...) como Salida
-  // Driver 1
-  pinMode(M0_IN1, OUTPUT); pinMode(M0_IN2, OUTPUT);
-  pinMode(M1_IN3, OUTPUT); pinMode(M1_IN4, OUTPUT);
-  // Driver 2
-  pinMode(M2_IN1, OUTPUT); pinMode(M2_IN2, OUTPUT);
-  pinMode(M3_IN3, OUTPUT); pinMode(M3_IN4, OUTPUT);
+  Serial.println("========================================");
+  Serial.println("   INICIANDO ESP32 CASA - MECANUM");
+  Serial.println("========================================");
 
-  // 2. Configurar PWM (ledc) para los pines ENA/ENB
+  // PASO 1: Configurar pines de dirección como OUTPUT y ponerlos en LOW
+  // Driver 1 (Trasero)
+  pinMode(M0_IN1, OUTPUT); digitalWrite(M0_IN1, LOW);
+  pinMode(M0_IN2, OUTPUT); digitalWrite(M0_IN2, LOW);
+  pinMode(M1_IN3, OUTPUT); digitalWrite(M1_IN3, LOW);
+  pinMode(M1_IN4, OUTPUT); digitalWrite(M1_IN4, LOW);
+  // Driver 2 (Frontal)
+  pinMode(M2_IN1, OUTPUT); digitalWrite(M2_IN1, LOW);
+  pinMode(M2_IN2, OUTPUT); digitalWrite(M2_IN2, LOW);
+  pinMode(M3_IN3, OUTPUT); digitalWrite(M3_IN3, LOW);
+  pinMode(M3_IN4, OUTPUT); digitalWrite(M3_IN4, LOW);
+
+  // PASO 2: Configurar PWM para los pines ENA/ENB
   // Driver 1
   ledcSetup(ch_M0, freq, resolution); ledcAttachPin(M0_ENA, ch_M0);
   ledcSetup(ch_M1, freq, resolution); ledcAttachPin(M1_ENB, ch_M1);
@@ -159,24 +166,75 @@ void setup() {
   ledcSetup(ch_M2, freq, resolution); ledcAttachPin(M2_ENA, ch_M2);
   ledcSetup(ch_M3, freq, resolution); ledcAttachPin(M3_ENB, ch_M3);
 
-  delay(2000);
+  // PASO 3: Asegurar PWM en 0
+  ledcWrite(ch_M0, 0);
+  ledcWrite(ch_M1, 0);
+  ledcWrite(ch_M2, 0);
+  ledcWrite(ch_M3, 0);
+  
+  Serial.println("✅ Hardware configurado");
+  delay(500);
+  
+  // ============================================================
+  // CONFIGURACIÓN MICRO-ROS CON DOMAIN ID Y NAMESPACE
+  // ============================================================
+  
+  // Configurar transporte micro-ROS
+  set_microros_serial_transports(Serial);
 
-  // Configuración micro-ROS (Igual que antes)
+  // Inicialización Micro-ROS
+  Serial.println("\nInicializando Micro-ROS...");
   allocator = rcl_get_default_allocator();
-  rclc_support_init(&support, 0, NULL, &allocator);
-  rclc_node_init_default(&node, "microros_esp32_omni", "", &support);
-
+  
+  // 1. Inicializar las opciones de init
+  init_options = rcl_get_zero_initialized_init_options();
+  rcl_init_options_init(&init_options, allocator);
+  
+  // 2. CONFIGURAR DOMAIN ID = 17 (igual que RPI y laptop)
+  Serial.println("📡 Configurando ROS_DOMAIN_ID = 17");
+  rcl_init_options_set_domain_id(&init_options, 17);
+  
+  // 3. Inicializar rclc_support CON las opciones configuradas
+  rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator);
+  
+  // 4. Inicializar nodo CON namespace 'roborescue'
+  const char * node_name = "esp32_casa_mecanum";
+  const char * node_namespace = "roborescue";
+  
+  Serial.print("🤖 Inicializando nodo: ");
+  Serial.print(node_namespace);
+  Serial.print("/");
+  Serial.println(node_name);
+  
+  rclc_node_init_default(&node, node_name, node_namespace, &support);
+  
+  // 5. Suscribirse al topic /roborescue/cmd_vel
   rclc_subscription_init_default(
-    &subscriber,
-    &node,
+    &subscriber, &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
     "cmd_vel");
-
+    
   rclc_executor_init(&executor, &support.context, 1, &allocator);
   rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA);
+  
+  Serial.println("========================================");
+  Serial.println("   ✅ MICRO-ROS INICIADO CORRECTAMENTE");
+  Serial.println("========================================");
+  Serial.print("   Domain ID: 17\n");
+  Serial.print("   Namespace: roborescue\n");
+  Serial.print("   Esperando en: /roborescue/cmd_vel\n");
+  Serial.println("========================================\n");
 }
 
 void loop() {
+  // Ejecutar ROS
   rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-  delay(10);
+
+  // SAFETY: Si no llegan comandos en 0.5s, parar todo
+  if (millis() - last_msg_time > 500) {
+    controlar_motor(0, 0); // Trasera Izq
+    controlar_motor(1, 0); // Trasera Der
+    controlar_motor(2, 0); // Frontal Izq
+    controlar_motor(3, 0); // Frontal Der
+  }
 }
