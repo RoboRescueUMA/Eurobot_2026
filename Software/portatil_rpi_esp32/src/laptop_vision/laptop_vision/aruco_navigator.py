@@ -52,7 +52,8 @@ class ArucoNavigator(Node):
         
         self.get_logger().info(
             f'✅ Navegador ArUco listo. Objetivo: {self.objetivo}, '
-            f'Zona muerta angular: {self.angular_deadband_deg}°, Timeout: {self.timeout_deteccion}s'
+            f'Zona muerta angular: {self.angular_deadband_deg}°, '
+            f'Goal tolerance: {self.tolerancia}m, Timeout: {self.timeout_deteccion}s'
         )
 
     def callback_posicion(self, msg):
@@ -70,6 +71,12 @@ class ArucoNavigator(Node):
             # Calcular distancia al objetivo
             distancia = math.sqrt(objetivo_x**2 + objetivo_y**2)
             
+            # DEBUG: Siempre mostrar comparación de distancia
+            self.get_logger().info(
+                f'🔍 DEBUG: distancia={distancia:.3f}m, tolerancia={self.tolerancia:.3f}m, '
+                f'¿distancia < tolerancia? {distancia < self.tolerancia}'
+            )
+            
             # Verificar si se alcanzó el objetivo
             if distancia < self.tolerancia:
                 if not self.objetivo_alcanzado:
@@ -81,47 +88,59 @@ class ArucoNavigator(Node):
             else:
                 self.objetivo_alcanzado = False
             
-            # ESTRATEGIA SECUENCIAL: 1) Alinearse primero, 2) Moverse en X-Y después
-            # Marco de cámara: X=derecha, Y=abajo (coordenadas típicas de imagen)
-            # Marco de robot: X=adelante, Y=izquierda
-            # Transformar coordenadas de cámara a marco del robot
-            # Asumiendo cámara montada cenital mirando hacia abajo:
-            #   camara_x -> robot_y (derecha de cámara = derecha del robot)
-            #   camara_y -> robot_x (abajo de cámara = adelante del robot)
-            marco_robot_x = objetivo_y  # Adelante
-            marco_robot_y = -objetivo_x  # Izquierda (negativo porque X de cámara es derecha)
+            # Las coordenadas (objetivo_x, objetivo_y) ya vienen en el frame del robot
+            # gracias a la transformación de rotación en aruco_detector.py
+            # 
+            # Marco de robot (estándar ROS): X=adelante, Y=izquierda
+            marco_robot_x = objetivo_x
+            marco_robot_y = objetivo_y  # SIN inversión, el detector ya da coordenadas correctas
             
-            # Control angular usando orientación del ArUco (theta_objetivo - theta_robot)
-            # Si objetivo_theta > 0: el objetivo está orientado más a la izquierda que el robot
-            # Si objetivo_theta < 0: el objetivo está orientado más a la derecha que el robot
-            error_angular = objetivo_theta
+            # Usar orientación relativa (Theta) de los ArUcos en lugar de ángulo de posición
+            # objetivo_theta = orientación de la caja - orientación del robot
+            # Si theta > 0: caja rotada a la izquierda respecto al robot
+            # Si theta < 0: caja rotada a la derecha respecto al robot
+            angulo_orientacion = objetivo_theta
             
-            # FASE 1: ALINEACIÓN - Primero girar hasta estar alineado
-            if abs(error_angular) > self.angular_deadband_rad:
-                # Robot desalineado -> SOLO rotar (sin movimiento XY)
-                velocidad_angular = self.ganancia_angular * error_angular
+            # FASE 1: ALINEACIÓN - Girar SOLO sobre sí mismo (sin moverse)
+            # Giro MUY LENTO para que cámara mantenga tracking
+            if abs(angulo_orientacion) > self.angular_deadband_rad:
+                # Robot desalineado -> SOLO girar, SIN movimiento XY
+                velocidad_angular = self.ganancia_angular * angulo_orientacion
                 velocidad_angular = max(-self.vel_angular_max, min(self.vel_angular_max, velocidad_angular))
                 velocidad_x = 0.0
                 velocidad_y = 0.0
-                estado = "🔄 ALINEANDO"
+                estado = "🔄 GIRANDO EN EL SITIO"
             else:
-                # FASE 2: MOVIMIENTO - Robot alineado -> Moverse en XY (sin rotar)
+                # FASE 2: AVANCE - Robot alineado -> Moverse hacia la caja
                 velocidad_angular = 0.0
                 
-                # Control proporcional en X e Y
+                # Movimiento XY hacia la caja (sin rotar más)
                 velocidad_x = self.ganancia_lineal * marco_robot_x
                 velocidad_y = self.ganancia_lineal * marco_robot_y
+                
+                # REDUCIR VELOCIDAD gradualmente cuando se acerca (para mejor control)
+                # Zona de desaceleración: desde 0.50m hasta goal_tolerance
+                ZONA_DESACELERACION = 0.50  # Empezar a reducir desde 50cm
+                if distancia < ZONA_DESACELERACION:
+                    factor_reduccion = distancia / ZONA_DESACELERACION  # De 1.0 a 0.0
+                    factor_reduccion = max(0.3, factor_reduccion)  # Mínimo 30% de velocidad
+                    velocidad_x *= factor_reduccion
+                    velocidad_y *= factor_reduccion
+                
+                # El ESP32 maneja PWM_MIN=80 automáticamente
+                # No forzamos velocidad mínima aquí
                 
                 # Limitar velocidades lineales
                 velocidad_x = max(-self.vel_lineal_max, min(self.vel_lineal_max, velocidad_x))
                 velocidad_y = max(-self.vel_lineal_max, min(self.vel_lineal_max, velocidad_y))
                 
-                estado = "➡️ MOVIENDO"
+                estado = "➡️ AVANZANDO"
             
             # Crear y publicar mensaje Twist
             cmd = Twist()
-            cmd.linear.x = velocidad_x
-            cmd.linear.y = velocidad_y  # Usar strafe lateral de Mecanum
+            # INVERSIÓN: Cámara rotada 180° invierte solo X, no Y
+            cmd.linear.x = -velocidad_x
+            cmd.linear.y = velocidad_y
             cmd.linear.z = 0.0
             cmd.angular.x = 0.0
             cmd.angular.y = 0.0
@@ -129,10 +148,11 @@ class ArucoNavigator(Node):
             
             self.pub_cmd_vel.publish(cmd)
             
-            # Log de estado con información de orientación
+            # Log de estado
             self.get_logger().info(
-                f'🎯 Objetivo: ({objetivo_x:.2f}, {objetivo_y:.2f}), θ={math.degrees(objetivo_theta):.1f}° | '
-                f'Distancia: {distancia:.2f}m | Error angular: {math.degrees(error_angular):.1f}° | '
+                f'🎯 Objetivo: ({objetivo_x:.2f}, {objetivo_y:.2f}) | '
+                f'Marco robot: X={marco_robot_x:.2f}m, Y={marco_robot_y:.2f}m | '
+                f'Dist: {distancia:.2f}m | Theta: {math.degrees(angulo_orientacion):.1f}° | '
                 f'{estado} | Cmd: vx={velocidad_x:.2f}, vy={velocidad_y:.2f}, w={velocidad_angular:.2f}'
             )
             

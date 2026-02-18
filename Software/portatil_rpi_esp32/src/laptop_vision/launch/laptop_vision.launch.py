@@ -70,12 +70,13 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'target': target,
-            'max_linear_speed': 0.6,
-            'max_angular_speed': 0.5,
-            'linear_p_gain': 1.8,
-            'angular_p_gain': 0.3,
-            'angular_deadband_deg': 10.0,
-            'goal_tolerance': 0.15
+            'max_linear_speed': 0.25,     # Reducido de 0.4 para movimientos más controlados
+            'max_angular_speed': 0.5,     # Giro controlado para buen tracking
+            'linear_p_gain': 2.5,         # Aumentado de 1.5 - necesario para generar vy > 0.31 (PWM_MIN=80)
+            'angular_p_gain': 0.6,        # Ganancia angular suave
+            'angular_deadband_deg': 20.0, # Zona muerta amplia: solo gira si está muy desalineado
+            'goal_tolerance': 0.20,       # Reducido de 0.35m - acercarse más al objetivo
+            'detection_timeout': 2.0      # Timeout de detección
         }]
     )
     

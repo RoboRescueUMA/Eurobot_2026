@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <math.h>  // Para sqrt() en cálculo de L
 #include <micro_ros_platformio.h>
 #include <rcl/rcl.h>
 #include <rclc/rclc.h>
@@ -6,26 +7,26 @@
 #include <geometry_msgs/msg/twist.h>
 
 // ================================================================
-//  CONFIGURACIÓN DE PINES (CORREGIDA - NO USAR 34/35/36/39)
+//  CONFIGURACIÓN DE PINES - INTERCAMBIADOS FRENTE/ATRÁS
 // ================================================================
 
-// DRIVER 1 (TRASERO)
-// Motor 1: Trasero Izquierda (RL)
-#define RL_PWM 25   
-#define RL_DIR 26  
+// DRIVER 1 (AHORA DELANTERO - los motores que SÍ funcionan bien)
+// Motor 1: Frontal Izquierda (FL)
+#define FL_PWM 25   
+#define FL_DIR 26  
 
-// Motor 2: Trasero Derecha (RR)
-#define RR_PWM 27   
-#define RR_DIR 14   
+// Motor 2: Frontal Derecha (FR)
+#define FR_PWM 27   
+#define FR_DIR 14   
 
-// DRIVER 2 (DELANTERO)
-// Motor 3: Frontal Izquierda (FL) -> CAMBIADO (34/35 eran solo input)
-#define FL_PWM 18  // Antes 34
-#define FL_DIR 19  // Antes 35
+// DRIVER 2 (AHORA TRASERO - los motores que necesitaban más potencia)
+// Motor 3: Trasero Izquierda (RL)
+#define RL_PWM 18
+#define RL_DIR 19
 
-// Motor 4: Frontal Derecha (FR)
-#define FR_PWM 32
-#define FR_DIR 33
+// Motor 4: Trasero Derecha (RR)
+#define RR_PWM 32
+#define RR_DIR 33
 
 // Configuración PWM
 const int freq = 1000;
@@ -34,6 +35,15 @@ const int ch_RL = 0;
 const int ch_RR = 1;
 const int ch_FL = 2;
 const int ch_FR = 3;
+
+// ================================================================
+//  GEOMETRÍA DEL ROBOT (para cinemática)
+// ================================================================
+// Distancia del centro del robot a las ruedas (en metros)
+const float Lx = 0.10;  // TODO: Medir distancia centro → rueda (eje X)
+const float Ly = 0.14;  // TODO: Medir distancia centro → rueda (eje Y)
+// Para X-Drive: distancia efectiva = diagonal
+const float L = Lx + Ly; 
 
 // Variables ROS
 rcl_subscription_t subscriber;
@@ -49,22 +59,25 @@ unsigned long last_msg_time = 0;
 // ================================================================
 //  CONTROLADOR MOTOR (DFRobot Logic: PWM + DIR)
 // ================================================================
-void set_motor(int channel, int dir_pin, float speed) {
+void set_motor(int channel, int dir_pin, float speed, bool invert_dir = false, const char* motor_name = "") {
   // Limitar
   if (speed > 1.0) speed = 1.0;
   if (speed < -1.0) speed = -1.0;
 
   int pwm = abs(speed) * 255;
   
-  // ZONA MUERTA (Importante para no quemar motores con poco voltaje)
-  if (pwm < 25) pwm = 0;
-
-  // DIRECCIÓN (Ajustar HIGH/LOW según tu cableado si va al revés)
-  if (speed > 0) {
-    digitalWrite(dir_pin, HIGH);
-  } else {
-    digitalWrite(dir_pin, LOW);
+  // PWM MÍNIMO para vencer fricción (ajustado por pruebas empíricas)
+  // Movimiento lateral requiere más PWM que movimiento adelante/atrás
+  const int PWM_MIN = 80;
+  if (pwm > 0 && pwm < PWM_MIN) {
+    pwm = PWM_MIN;
   }
+
+  // DIRECCIÓN (con opción de invertir)
+  bool direction = (speed > 0);
+  if (invert_dir) direction = !direction;
+  
+  digitalWrite(dir_pin, direction ? HIGH : LOW);
   
   ledcWrite(channel, pwm);
 }
@@ -72,19 +85,43 @@ void set_motor(int channel, int dir_pin, float speed) {
 // ================================================================
 //  CALLBACK CINEMÁTICA MECANUM
 // ================================================================
+// PRUEBAS ESPERADAS (con z invertido):
+// 1. linear.x = +0.3 → Robot avanza ADELANTE
+// 2. linear.y = +0.3 → Robot se mueve a la IZQUIERDA (strafe)
+// 3. angular.z = +0.5 → Robot gira HORARIO (sentido de las agujas del reloj)
+//    NOTA: z invertido porque hardware requiere signo opuesto
+// 4. Combinado: x=0.3, y=0.3 → Robot avanza en DIAGONAL (adelante-izquierda)
+// 
+// IMPORTANTE: Antes de probar, medir y actualizar Lx, Ly (líneas 40-42)
+// ================================================================
 void subscription_callback(const void * msgin) {
   const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)msgin;
   last_msg_time = millis(); // Resetear watchdog
 
-  float x = msg->linear.x; 
-  float y = msg->linear.y; 
-  float z = msg->angular.z; 
+  float x = -msg->linear.x;  // Adelante (+) / Atrás (-) [m/s] - INVERTIDO por swap de pines
+  float y = msg->linear.y;   // Izquierda (+) / Derecha (-) [m/s]
+  float w = msg->angular.z;  // Giro antihorario (+) / horario (-) [rad/s]
+  
+  // Convertir velocidad angular (rad/s) a velocidad tangencial (m/s)
+  // w positivo = giro antihorario, pero las ruedas giran al revés
+  float z = -w * L/L;  // Invertir signo de rotación y escalar por distancia
 
-  // Cinemática X-Drive
-  float fl = x + y + z;
-  float fr = x - y - z;
-  float rl = x - y + z;
-  float rr = x + y - z;
+  // MODO DEBUG: Activar solo un motor a la vez
+  // Descomentar UNA línea para probar cada motor individualmente
+  
+  // set_motor(ch_FL, FL_DIR, x, false, "FL");  // Probar FL solo
+  // set_motor(ch_FR, FR_DIR, x, false, "FR");  // Probar FR solo
+  // set_motor(ch_RL, RL_DIR, x, false, "RL");  // Probar RL solo
+  // set_motor(ch_RR, RR_DIR, x, false, "RR");  // Probar RR solo
+  
+  // Cinemática X-Drive con z invertido
+  float fl = x - y + z;  // Front Left
+  float fr = x + y - z;  // Front Right
+  float rl = x + y + z;  // Rear Left
+  float rr = x - y - z;  // Rear Right
+
+  // COMPENSACIÓN: FL necesita más potencia (ajustar factor según necesites)
+  fl *= 1.15;  // 15% más potencia para FL
 
   // Normalizar
   float max_val = max(abs(fl), max(abs(fr), max(abs(rl), abs(rr))));
@@ -92,10 +129,10 @@ void subscription_callback(const void * msgin) {
     fl /= max_val; fr /= max_val; rl /= max_val; rr /= max_val;
   }
 
-  set_motor(ch_FL, FL_DIR, fl);
-  set_motor(ch_FR, FR_DIR, fr);
-  set_motor(ch_RL, RL_DIR, rl);
-  set_motor(ch_RR, RR_DIR, rr);
+  set_motor(ch_FL, FL_DIR, fl, false, "FL");
+  set_motor(ch_FR, FR_DIR, fr, false, "FR");
+  set_motor(ch_RL, RL_DIR, rl, false, "RL");
+  set_motor(ch_RR, RR_DIR, rr, false, "RR");
 }
 
 void setup() {

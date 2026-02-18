@@ -51,7 +51,7 @@ laptop_rpi_esp/
 │   │   ├── launch/                  # Launch files
 │   │   └── config/camera.yaml       # Configuración de cámara
 │   ├── rpi_relay/              # 🆕 Relay de comandos (RPI4)
-│   │   └── cmd_vel_relay.py         # Reenvía /robot1/cmd_vel → /cmd_vel
+│   │   └── cmd_vel_relay.py         # Reenvía /roborescue/cmd_vel_laptop → /roborescue/cmd_vel
 │   ├── robot_vision/           # (Antiguo - backup)
 │   ├── robot_navigator/        # (Antiguo - backup)
 │   └── interfaces/             # Mensajes y servicios personalizados (TODO)
@@ -88,6 +88,27 @@ laptop_rpi_esp/
 - **Python 3.10+** con OpenCV, NumPy
 - **PlatformIO** (para ESP32)
 - **micro-ROS** (para comunicación ESP32-ROS2)
+
+### Configuración del Sistema
+
+- **ROS_DOMAIN_ID:** 17 (evita conflictos con otros robots)
+- **Namespace:** `roborescue`
+- **Cámara IP:** `10.16.250.84:5000`
+- **ArUco IDs:**
+  - Robot: 1
+  - Caja azul: 36
+  - Caja amarilla: 47
+- **Diccionario ArUco:** DICT_4X4_50
+
+### Parámetros de Navegación (Actuales)
+
+- **max_linear_speed:** 0.25 m/s
+- **max_angular_speed:** 0.5 rad/s
+- **linear_p_gain:** 2.5 (necesario para generar velocidad > PWM_MIN)
+- **angular_p_gain:** 0.6
+- **angular_deadband:** 20° (gira en sitio si desalineación > 20°)
+- **goal_tolerance:** 0.20 m (distancia de parada al objetivo)
+- **PWM_MIN:** 80 (~0.31 m/s - necesario para vencer fricción estática)
 
 ---
 
@@ -183,17 +204,20 @@ Este es el sistema actualmente en uso que implementa visión zenital con ArUco m
 cd ~/Desktop/GitHub/pruebas_eurobot
 source install/setup.bash
 
+# IMPORTANTE: Configurar ROS_DOMAIN_ID=17
+export ROS_DOMAIN_ID=17
+
 # Configurar el IP de la cámara (app IPCamera en móvil)
-# Reemplazar 192.168.100.122:5000 con tu IP:puerto
+# IP actual: 10.16.250.84:5000
 
 # Opción 1: Navegar hacia caja azul
 ros2 launch laptop_vision laptop_vision.launch.py \
-  camera_ip:=192.168.100.122:5000 \
+  camera_ip:=10.16.250.84:5000 \
   target:=blue_box
 
 # Opción 2: Navegar hacia caja amarilla
 ros2 launch laptop_vision laptop_vision.launch.py \
-  camera_ip:=192.168.100.122:5000 \
+  camera_ip:=10.16.250.84:5000 \
   target:=yellow_box
 
 # Ver imagen con detecciones en tiempo real
@@ -210,10 +234,13 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/image_raw/compressed
 cd ~/Desktop/GitHub/pruebas_eurobot
 source install/setup.bash
 
+# IMPORTANTE: Configurar ROS_DOMAIN_ID=17
+export ROS_DOMAIN_ID=17
+
 # Terminal 1: Micro-ROS Agent (comunicación con ESP32)
 ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 
-# Terminal 2: Relay de comandos (reenvía /robot1/cmd_vel → /cmd_vel)
+# Terminal 2: Relay de comandos (reenvía /roborescue/cmd_vel_laptop → /roborescue/cmd_vel)
 ros2 run rpi_relay cmd_vel_relay
 ```
 
@@ -225,8 +252,8 @@ El sistema de visión detecta tanto **posición** como **orientación** de los m
 
 **Marcadores necesarios:**
 - **ID=1** - Robot (sobre el robot móvil)
-- **ID=2** - Caja azul (objetivo)
-- **ID=3** - Caja amarilla (objetivo)
+- **ID=36** - Caja azul (objetivo)
+- **ID=47** - Caja amarilla (objetivo)
 
 **Cómo identificar la esquina 0:**
 1. Lanzar el sistema con visualización debug:
@@ -321,19 +348,22 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
   │                     │        │                     │        │                  │
   │  laptop_vision      │        │   rpi_relay         │        │  micro-ROS       │
   │  ├─ camera_pub      │        │   ├─ cmd_vel_relay  │        │  ├─ Cinemática   │
-  │  ├─ aruco_detect◄───┼────────┼──►│   (namespace    │        │  │   Mecanum      │
-  │  └─ aruco_nav       │  ROS2  │   │    removal)     │        │  └─ Control PWM  │
-  │                     │  WiFi  │   └─────────┬───────┼────────┼─────────►        │
+  │  ├─ aruco_detect◄───┼────────┼──►│   (relay with   │        │  │   Mecanum      │
+  │  └─ aruco_nav       │  ROS2  │   │    namespace)   │        │  └─ Control PWM  │
+  │                     │  WiFi  │   └─────────┬───────┼────────┼──────PWM_MIN=80──►
   │  Publicadores:      │  DDS   │             │       │ Serial │                  │
-  │  /robot1/zenital/*  │        │   /robot1/  │       │ micro- │   Suscriptor:    │
-  │  /robot1/*_pos      │        │   cmd_vel   │       │  ROS   │   /cmd_vel       │
-  │  /robot1/cmd_vel... │        │      ↓      │       │        │                  │
-  └──────────┬──────────┘        │   /cmd_vel  │       │        └────────┬─────────┘
+  │  /roborescue/       │        │  /roborescue│       │ micro- │   Suscriptor:    │
+  │    zenital/*        │        │  /cmd_vel_  │       │  ROS   │  /roborescue/    │
+  │  /roborescue/       │        │   laptop    │       │        │    cmd_vel       │
+  │    *_pose           │        │      ↓      │       │        │                  │
+  │  /roborescue/       │        │  /roborescue│       │        │                  │
+  │    cmd_vel_laptop   │        │   /cmd_vel  │       │        │                  │
+  └──────────┬──────────┘        └─────────────┘       │        └────────┬─────────┘
              │                   └─────────────┘       │                 │
              │                                         │                 │
-     Cámara IP (móvil)                         micro_ros_agent    4x Motores DC
-     ArUco tracking                            (ROS2↔micro-ROS)   + 2x Drivers
-     (192.168.x.x:5000)                        bridge process     (Ruedas Mecanum)
+      Cámara IP (móvil)                         micro_ros_agent    4x Motores DC
+      ArUco tracking                            (ROS2↔micro-ROS)   + 2x Drivers
+      (10.16.250.84:5000)                       bridge process     (Ruedas Mecanum)
 ```
 
 ### Flujo de Datos Completo
@@ -344,8 +374,8 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 4. **Portátil** `aruco_detector` calcula posiciones y orientaciones relativas → Publica en `/roborescue/*_pose` (Pose2D: x, y, theta)
 5. **Portátil** `aruco_navigator` recibe poses → Calcula velocidades usando orientación ArUco (control proporcional)
 6. **Portátil** `aruco_navigator` publica comandos → `/roborescue/cmd_vel_laptop` (Twist)
-7. **RPI4** `cmd_vel_relay` reenvía → `/roborescue/cmd_vel_laptop` → `/cmd_vel` (sin namespace)
-8. **ESP32** recibe vía micro-ROS → `/cmd_vel` (Twist)
+7. **RPI4** `cmd_vel_relay` reenvía → `/roborescue/cmd_vel_laptop` → `/roborescue/cmd_vel`
+8. **ESP32** recibe vía micro-ROS → `/roborescue/cmd_vel` (Twist)
 9. **ESP32** calcula cinemática inversa → Velocidades individuales de 4 ruedas Mecanum
 10. **ESP32** envía PWM → 4 motores DC → Robot se mueve omnidireccionalmente
 
@@ -356,16 +386,16 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 - `/roborescue/zenital/image_raw/compressed` - Video comprimido (CompressedImage)
 - `/roborescue/zenital/debug` - Video con anotaciones ArUco (Image)
 - `/roborescue/robot_pose` - Posición y orientación del robot, siempre (0, 0, 0) como referencia (Pose2D)
-- `/roborescue/blue_box_pose` - Posición y orientación relativa de caja azul (Pose2D)
-- `/roborescue/yellow_box_pose` - Posición y orientación relativa de caja amarilla (Pose2D)
+- `/roborescue/blue_box_pose` - Posición y orientación relativa de caja azul ID=36 (Pose2D)
+- `/roborescue/yellow_box_pose` - Posición y orientación relativa de caja amarilla ID=47 (Pose2D)
 - `/roborescue/cmd_vel_laptop` - Comandos de velocidad (Twist)
 
 **RPI4 relay:**
 - Suscribe: `/roborescue/cmd_vel_laptop` (Twist)
-- Publica: `/cmd_vel` (Twist) - Para ESP32 vía micro-ROS
+- Publica: `/roborescue/cmd_vel` (Twist) - Para ESP32 vía micro-ROS
 
 **ESP32 suscribe:**
-- `/cmd_vel` (Twist) - Velocidades lineales (x, y) y angular (theta)
+- `/roborescue/cmd_vel` (Twist) - Velocidades lineales (x, y) y angular (theta)
 
 ---
 
@@ -414,30 +444,29 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 - [x] **Navegación autónoma básica** - Control proporcional hacia cajas azul/amarilla (ambas probadas)
 - [x] **Timeout de seguridad** - Robot se detiene automáticamente sin detección (1s)
 - [x] **Cámara IP funcional** - Streaming desde móvil con app IPCamera
-- [x] **Namespace correcto en ROS2** - Topics organizados bajo `/robot1/`
+- [x] **Namespace correcto en ROS2** - Topics organizados bajo `/roborescue/`
 - [x] **Comunicación RPI ↔ Laptop** - ROS2 DDS sobre WiFi/Ethernet
-- [x] **Relay de comandos en RPI** - `/robot1/cmd_vel_laptop` → `/cmd_vel`
-- [x] **Conexión ESP32 ↔ RPI (micro-ROS)** - Serial /dev/ttyUSB0 funcionando
+- [x] **Relay de comandos en RPI** - `/roborescue/cmd_vel_laptop` → `/roborescue/cmd_vel`
+- [x] **Conexión ESP32 ↔ RPI (micro-ROS)** - Serial /dev/ttyUSB0 con namespace funcionando
 - [x] **Integración completa 3 capas** - Sistema end-to-end probado exitosamente
 - [x] **Control de motores desde visión** - Robot se mueve según detección ArUco
+- [x] **Calibración PWM para fricción** - PWM_MIN=80 permite vencer fricción estática
+- [x] **Inversión de coordenadas 180°** - Sistema funciona con cámara rotada 180°
+- [x] **Movimiento omnidireccional** - Navegación con strafing lateral funcional
+- [x] **Ajuste de ganancias proporcionales** - linear_p_gain=2.5, angular_p_gain=0.6
 
 #### 🔄 En Progreso
 
-- [ ] **Pruebas con ArUco en el robot** - Navegación en suelo con marcador sobre robot móvil
-- [ ] **Control de velocidad adaptativo** - Reducir velocidad según distancia al objetivo
-- [ ] **Calibración de ganancias PID** - Ajustar `linear_p_gain` y `angular_p_gain` en terreno real
-- [x] **Implementar strafing lateral** - Usar `cmd.linear.y` para movimiento omnidireccional Mecanum (código listo, pendiente prueba)
+- [ ] **Pruebas en arena de competición** - Validar navegación en superficie plana de competencia
+- [ ] **Mapeo proporcional de PWM** - Implementar PWM 60-255 proporcional en vez de umbral fijo PWM_MIN=80
+- [ ] **Filtrado de posiciones ArUco** - Aplicar promedio móvil para reducir jitter de detección
+- [ ] **Cálculo de distancia 2D** - Ignorar diferencia de altura entre ArUcos (proyección en plano XY)
 
 #### 📋 Pendientes
 
-- [ ] **Lectura de encoders en ESP32** - Implementar odometría para cerrar el lazo de control
-- [ ] **Añadir límites del área de juego** - Detección de bordes del campo (2m x 3m)
-- [ ] **Evitación de obstáculos** - Sensores ultrasónicos o detección por visión
-- [ ] **Planificación de trayectorias** - Secuencia de movimientos para múltiples objetivos
-- [ ] **Estrategia de juego Eurobot 2026** - Maximizar puntuación según reglamento
-- [ ] **Pruebas en escenario impreso** - Campo a escala real (arena 2m x 3m)
-- [ ] **Calibración de cámaras** - Corrección de distorsión de lente
-- [ ] **Sistema de telemetría** - Dashboard para monitoreo en tiempo real
+- [ ] **Mejorar cálculo de distancia** - Usar distancia 2D proyectada (ignorar diferencia de altura ArUco)
+- [ ] **Optimizar control cerca del objetivo** - Reducir PWM_MIN o implementar mapeo proporcional
+- [ ] **Control PID completo** - Añadir términos I y D para mejor estabilidad
 
 ---
 
@@ -511,4 +540,4 @@ Por definir por el equipo.
 
 ---
 
-**Última actualización:** Febrero 7, 2026
+**Última actualización:** Febrero 18, 2026

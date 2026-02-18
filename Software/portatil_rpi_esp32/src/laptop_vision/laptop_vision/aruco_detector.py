@@ -171,7 +171,7 @@ class ArucoDetector(Node):
                     
                     # Publicar posición de caja azul (relativa al robot)
                     if pos_caja_azul_px and esquinas_caja_azul is not None:
-                        # Posición relativa en coordenadas de imagen
+                        # Posición relativa en coordenadas de imagen (frame fijo de cámara)
                         dx_px = pos_caja_azul_px[0] - pos_robot_px[0]
                         dy_px = pos_caja_azul_px[1] - pos_robot_px[1]
                         distancia_px = np.sqrt(dx_px**2 + dy_px**2)
@@ -181,14 +181,24 @@ class ArucoDetector(Node):
                         dy_m = dy_px / pixeles_por_metro
                         distancia_m = distancia_px / pixeles_por_metro
                         
+                        # TRANSFORMACIÓN: Rotar coordenadas de frame de cámara a frame del robot
+                        # theta_robot indica la orientación del robot en el frame de cámara
+                        # Necesitamos rotar las coordenadas (dx_m, dy_m) por theta_robot (no -theta_robot)
+                        cos_theta = np.cos(theta_robot)
+                        sin_theta = np.sin(theta_robot)
+                        
+                        # Rotación 2D: [x', y'] = R(theta) * [x, y]
+                        dx_robot_frame = dx_m * cos_theta - dy_m * sin_theta
+                        dy_robot_frame = dx_m * sin_theta + dy_m * cos_theta
+                        
                         # Orientación de la caja
                         theta_caja = self.calcular_orientacion(esquinas_caja_azul)
                         # Orientación relativa al robot (convertir a float de Python)
                         theta_rel = float(theta_caja - theta_robot)
                         
                         msg_azul = Pose2D()
-                        msg_azul.x = float(dx_m)
-                        msg_azul.y = float(dy_m)
+                        msg_azul.x = float(dx_robot_frame)
+                        msg_azul.y = float(dy_robot_frame)
                         msg_azul.theta = theta_rel
                         self.pub_pos_caja_azul.publish(msg_azul)
                         
@@ -207,13 +217,13 @@ class ArucoDetector(Node):
                                        (255, 0, 0), 2, tipLength=0.3)
                         
                         self.get_logger().info(
-                            f'🔵 Caja azul a {distancia_m:.2f}m | X: {dx_m:.2f}, Y: {dy_m:.2f}, '
+                            f'🔵 Caja azul a {distancia_m:.2f}m | X: {dx_robot_frame:.2f}, Y: {dy_robot_frame:.2f}, '
                             f'Theta: {np.degrees(theta_rel):.1f}°'
                         )
                     
                     # Publicar posición de caja amarilla (relativa al robot)
                     if pos_caja_amarilla_px and esquinas_caja_amarilla is not None:
-                        # Posición relativa en coordenadas de imagen
+                        # Posición relativa en coordenadas de imagen (frame fijo de cámara)
                         dx_px = pos_caja_amarilla_px[0] - pos_robot_px[0]
                         dy_px = pos_caja_amarilla_px[1] - pos_robot_px[1]
                         distancia_px = np.sqrt(dx_px**2 + dy_px**2)
@@ -223,14 +233,22 @@ class ArucoDetector(Node):
                         dy_m = dy_px / pixeles_por_metro
                         distancia_m = distancia_px / pixeles_por_metro
                         
+                        # TRANSFORMACIÓN: Rotar coordenadas de frame de cámara a frame del robot
+                        cos_theta = np.cos(theta_robot)
+                        sin_theta = np.sin(theta_robot)
+                        
+                        # Rotación 2D: [x', y'] = R(theta) * [x, y]
+                        dx_robot_frame = dx_m * cos_theta - dy_m * sin_theta
+                        dy_robot_frame = dx_m * sin_theta + dy_m * cos_theta
+                        
                         # Orientación de la caja
                         theta_caja = self.calcular_orientacion(esquinas_caja_amarilla)
                         # Orientación relativa al robot (convertir a float de Python)
                         theta_rel = float(theta_caja - theta_robot)
                         
                         msg_amarillo = Pose2D()
-                        msg_amarillo.x = float(dx_m)
-                        msg_amarillo.y = float(dy_m)
+                        msg_amarillo.x = float(dx_robot_frame)
+                        msg_amarillo.y = float(dy_robot_frame)
                         msg_amarillo.theta = theta_rel
                         self.pub_pos_caja_amarilla.publish(msg_amarillo)
                         
@@ -249,7 +267,7 @@ class ArucoDetector(Node):
                                        (0, 255, 255), 2, tipLength=0.3)
                         
                         self.get_logger().info(
-                            f'🟡 Caja amarilla a {distancia_m:.2f}m | X: {dx_m:.2f}, Y: {dy_m:.2f}, '
+                            f'🟡 Caja amarilla a {distancia_m:.2f}m | X: {dx_robot_frame:.2f}, Y: {dy_robot_frame:.2f}, '
                             f'Theta: {np.degrees(theta_rel):.1f}°'
                         )
 
