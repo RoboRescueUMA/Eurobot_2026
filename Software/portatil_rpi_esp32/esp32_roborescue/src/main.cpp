@@ -5,6 +5,7 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 #include <geometry_msgs/msg/twist.h>
+#include <std_msgs/msg/float32_multi_array.h>
 
 // ================================================================
 //  CONFIGURACIÓN DE PINES - INTERCAMBIADOS FRENTE/ATRÁS
@@ -28,6 +29,20 @@
 #define RR_PWM 32
 #define RR_DIR 33
 
+// ================================================================
+//  PINES ENCODERS (Canales A y B)
+// ================================================================
+// Pines GPIO disponibles en ESP32 DevKit v1 (30 pines)
+// Evitando: GPIO 1,3 (Serial), 6-11 (Flash), pines ya usados por motores
+#define FL_ENC_A 34
+#define FL_ENC_B 35
+#define FR_ENC_A 12
+#define FR_ENC_B 13
+#define RL_ENC_A 15
+#define RL_ENC_B 4
+#define RR_ENC_A 16
+#define RR_ENC_B 17
+
 // Configuración PWM
 const int freq = 1000;
 const int resolution = 8;
@@ -35,6 +50,31 @@ const int ch_RL = 0;
 const int ch_RR = 1;
 const int ch_FL = 2;
 const int ch_FR = 3;
+
+// ================================================================
+//  CONFIGURACIÓN ENCODERS
+// ================================================================
+// Especificaciones del motor
+const int PPR_MOTOR = 11;           // Pulsos por revolución del motor
+const int GEAR_RATIO = 34;          // Relación de reducción 1:34
+const int PPR_WHEEL = PPR_MOTOR * GEAR_RATIO;  // 11 * 34 = 374 pulsos/vuelta en rueda
+const int COUNTS_PER_REV = PPR_WHEEL * 4;      // Con cuadratura x4 = 1496 counts/vuelta
+
+// Variables de conteo de encoders (volatile porque se usan en ISR)
+volatile long enc_count_FL = 0;
+volatile long enc_count_FR = 0;
+volatile long enc_count_RL = 0;
+volatile long enc_count_RR = 0;
+
+// Variables para cálculo de velocidad
+unsigned long last_encoder_time = 0;
+const unsigned long ENCODER_SAMPLE_TIME = 50; // Calcular velocidad cada 50ms
+
+// Velocidades calculadas (en pulsos/seg)
+float vel_FL = 0.0;
+float vel_FR = 0.0;
+float vel_RL = 0.0;
+float vel_RR = 0.0;
 
 // ================================================================
 //  GEOMETRÍA DEL ROBOT (para cinemática)
@@ -45,9 +85,50 @@ const float Ly = 0.14;  // TODO: Medir distancia centro → rueda (eje Y)
 // Para X-Drive: distancia efectiva = diagonal
 const float L = Lx + Ly; 
 
+// ================================================================
+//  INTERRUPCIONES ENCODERS (ISR)
+// ================================================================
+// ISR para Front Left (FL)
+void IRAM_ATTR isr_FL_A() {
+  if (digitalRead(FL_ENC_A) == digitalRead(FL_ENC_B)) {
+    enc_count_FL++;
+  } else {
+    enc_count_FL--;
+  }
+}
+
+// ISR para Front Right (FR)
+void IRAM_ATTR isr_FR_A() {
+  if (digitalRead(FR_ENC_A) == digitalRead(FR_ENC_B)) {
+    enc_count_FR++;
+  } else {
+    enc_count_FR--;
+  }
+}
+
+// ISR para Rear Left (RL)
+void IRAM_ATTR isr_RL_A() {
+  if (digitalRead(RL_ENC_A) == digitalRead(RL_ENC_B)) {
+    enc_count_RL++;
+  } else {
+    enc_count_RL--;
+  }
+}
+
+// ISR para Rear Right (RR)
+void IRAM_ATTR isr_RR_A() {
+  if (digitalRead(RR_ENC_A) == digitalRead(RR_ENC_B)) {
+    enc_count_RR++;
+  } else {
+    enc_count_RR--;
+  }
+} 
+
 // Variables ROS
 rcl_subscription_t subscriber;
+rcl_publisher_t publisher_encoder_vel;
 geometry_msgs__msg__Twist msg;
+std_msgs__msg__Float32MultiArray encoder_msg;
 rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
@@ -162,6 +243,25 @@ void setup() {
   ledcWrite(ch_FR, 0);
   
   Serial.println("✅ Hardware configurado");
+  
+  // PASO 4: Configurar pines de encoders como INPUT con PULLUP
+  Serial.println("Configurando encoders...");
+  pinMode(FL_ENC_A, INPUT_PULLUP);
+  pinMode(FL_ENC_B, INPUT_PULLUP);
+  pinMode(FR_ENC_A, INPUT_PULLUP);
+  pinMode(FR_ENC_B, INPUT_PULLUP);
+  pinMode(RL_ENC_A, INPUT_PULLUP);
+  pinMode(RL_ENC_B, INPUT_PULLUP);
+  pinMode(RR_ENC_A, INPUT_PULLUP);
+  pinMode(RR_ENC_B, INPUT_PULLUP);
+  
+  // PASO 5: Configurar interrupciones para encoders (solo canal A)
+  attachInterrupt(digitalPinToInterrupt(FL_ENC_A), isr_FL_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FR_ENC_A), isr_FR_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RL_ENC_A), isr_RL_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RR_ENC_A), isr_RR_A, CHANGE);
+  
+  Serial.println("✅ Encoders configurados");
   delay(500);
   
   // ============================================================
@@ -202,6 +302,17 @@ void setup() {
     &subscriber, &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
     "cmd_vel");
+  
+  // 6. Crear publisher para velocidades de encoders
+  // Inicializar mensaje de encoders (4 floats: FL, FR, RL, RR en RPM)
+  encoder_msg.data.capacity = 4;
+  encoder_msg.data.size = 4;
+  encoder_msg.data.data = (float*) malloc(encoder_msg.data.capacity * sizeof(float));
+  
+  rclc_publisher_init_default(
+    &publisher_encoder_vel, &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray),
+    "encoder_velocities");
     
   rclc_executor_init(&executor, &support.context, 1, &allocator);
   rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA);
@@ -211,13 +322,71 @@ void setup() {
   Serial.println("========================================");
   Serial.print("   Domain ID: 17\n");
   Serial.print("   Namespace: roborescue\n");
-  Serial.print("   Esperando en: /roborescue/cmd_vel\n");
+  Serial.print("   Subscrito: /roborescue/cmd_vel\n");
+  Serial.print("   Publicando: /roborescue/encoder_velocities\n");
   Serial.println("========================================\n");
+  
+  last_encoder_time = millis();
+}
+
+// ================================================================
+//  FUNCIÓN PARA CALCULAR Y PUBLICAR VELOCIDADES DE ENCODERS
+// ================================================================
+void update_encoder_velocities() {
+  unsigned long current_time = millis();
+  float dt = (current_time - last_encoder_time) / 1000.0;  // Tiempo en segundos
+  
+  if (dt >= ENCODER_SAMPLE_TIME / 1000.0) {
+    // Calcular velocidad en pulsos/segundo
+    vel_FL = enc_count_FL / dt;
+    vel_FR = enc_count_FR / dt;
+    vel_RL = enc_count_RL / dt;
+    vel_RR = enc_count_RR / dt;
+    
+    // Convertir a RPM: (pulsos/seg) * (60 seg/min) / (pulsos/rev)
+    float rpm_FL = (vel_FL * 60.0) / COUNTS_PER_REV;
+    float rpm_FR = (vel_FR * 60.0) / COUNTS_PER_REV;
+    float rpm_RL = (vel_RL * 60.0) / COUNTS_PER_REV;
+    float rpm_RR = (vel_RR * 60.0) / COUNTS_PER_REV;
+    
+    // Publicar velocidades en ROS (en RPM)
+    encoder_msg.data.data[0] = rpm_FL;
+    encoder_msg.data.data[1] = rpm_FR;
+    encoder_msg.data.data[2] = rpm_RL;
+    encoder_msg.data.data[3] = rpm_RR;
+    
+    rcl_publish(&publisher_encoder_vel, &encoder_msg, NULL);
+    
+    // DEBUG: Imprimir en serial cada 500ms
+    static unsigned long last_debug_print = 0;
+    if (current_time - last_debug_print > 500) {
+      Serial.print("Encoders RPM -> FL:");
+      Serial.print(rpm_FL);
+      Serial.print(" FR:");
+      Serial.print(rpm_FR);
+      Serial.print(" RL:");
+      Serial.print(rpm_RL);
+      Serial.print(" RR:");
+      Serial.println(rpm_RR);
+      last_debug_print = current_time;
+    }
+    
+    // Resetear contadores
+    enc_count_FL = 0;
+    enc_count_FR = 0;
+    enc_count_RL = 0;
+    enc_count_RR = 0;
+    
+    last_encoder_time = current_time;
+  }
 }
 
 void loop() {
   // Ejecutar ROS
   rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+  
+  // Actualizar y publicar velocidades de encoders
+  update_encoder_velocities();
 
   // SAFETY: Si no llegan comandos en 0.5s, parar todo
   if (millis() - last_msg_time > 500) {
