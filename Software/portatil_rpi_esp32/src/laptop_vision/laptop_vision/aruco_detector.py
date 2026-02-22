@@ -182,14 +182,19 @@ class ArucoDetector(Node):
                         distancia_m = distancia_px / pixeles_por_metro
                         
                         # TRANSFORMACIÓN: Rotar coordenadas de frame de cámara a frame del robot
-                        # theta_robot indica la orientación del robot en el frame de cámara
-                        # Necesitamos rotar las coordenadas (dx_m, dy_m) por theta_robot (no -theta_robot)
+                        # theta_robot es la orientación del robot en el frame de cámara
+                        # Usamos rotación directa R(theta) para transformar del frame de cámara al frame del robot
+                        # IMPORTANTE: En OpenCV, Y+ apunta ABAJO, entonces necesitamos negar dy_m
                         cos_theta = np.cos(theta_robot)
                         sin_theta = np.sin(theta_robot)
                         
+                        # Ajustar por convención de OpenCV (Y+ hacia abajo)
+                        dx_cam = dx_m
+                        dy_cam = -dy_m  # Negar Y porque en imagen Y+ apunta abajo
+                        
                         # Rotación 2D: [x', y'] = R(theta) * [x, y]
-                        dx_robot_frame = dx_m * cos_theta - dy_m * sin_theta
-                        dy_robot_frame = dx_m * sin_theta + dy_m * cos_theta
+                        dx_robot_frame = dx_cam * cos_theta - dy_cam * sin_theta
+                        dy_robot_frame = dx_cam * sin_theta + dy_cam * cos_theta
                         
                         # Orientación de la caja
                         theta_caja = self.calcular_orientacion(esquinas_caja_azul)
@@ -237,9 +242,13 @@ class ArucoDetector(Node):
                         cos_theta = np.cos(theta_robot)
                         sin_theta = np.sin(theta_robot)
                         
+                        # Ajustar por convención de OpenCV (Y+ hacia abajo)
+                        dx_cam = dx_m
+                        dy_cam = -dy_m  # Negar Y porque en imagen Y+ apunta abajo
+                        
                         # Rotación 2D: [x', y'] = R(theta) * [x, y]
-                        dx_robot_frame = dx_m * cos_theta - dy_m * sin_theta
-                        dy_robot_frame = dx_m * sin_theta + dy_m * cos_theta
+                        dx_robot_frame = dx_cam * cos_theta - dy_cam * sin_theta
+                        dy_robot_frame = dx_cam * sin_theta + dy_cam * cos_theta
                         
                         # Orientación de la caja
                         theta_caja = self.calcular_orientacion(esquinas_caja_amarilla)

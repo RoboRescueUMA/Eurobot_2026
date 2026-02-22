@@ -15,6 +15,8 @@ class ArucoNavigator(Node):
         self.declare_parameter('linear_p_gain', 0.5)
         self.declare_parameter('angular_p_gain', 1.5)
         self.declare_parameter('angular_deadband_deg', 10.0)  # Zona muerta en grados
+        self.declare_parameter('umbral_histeresis_entrar_deg', 20.0)  # Entrar a modo rotación
+        self.declare_parameter('umbral_histeresis_salir_deg', 10.0)   # Salir de modo rotación
         self.declare_parameter('goal_tolerance', 0.1)  # metros
         self.declare_parameter('detection_timeout', 1.0)  # segundos sin detección antes de parar
         
@@ -26,6 +28,13 @@ class ArucoNavigator(Node):
         self.ganancia_angular = self.get_parameter('angular_p_gain').get_parameter_value().double_value
         self.angular_deadband_deg = self.get_parameter('angular_deadband_deg').get_parameter_value().double_value
         self.angular_deadband_rad = math.radians(self.angular_deadband_deg)
+        
+        # Parámetros de histéresis
+        self.umbral_histeresis_entrar_deg = self.get_parameter('umbral_histeresis_entrar_deg').get_parameter_value().double_value
+        self.umbral_histeresis_salir_deg = self.get_parameter('umbral_histeresis_salir_deg').get_parameter_value().double_value
+        self.umbral_histeresis_entrar_rad = math.radians(self.umbral_histeresis_entrar_deg)
+        self.umbral_histeresis_salir_rad = math.radians(self.umbral_histeresis_salir_deg)
+        
         self.tolerancia = self.get_parameter('goal_tolerance').get_parameter_value().double_value
         self.timeout_deteccion = self.get_parameter('detection_timeout').get_parameter_value().double_value
         
@@ -46,14 +55,15 @@ class ArucoNavigator(Node):
         self.objetivo_alcanzado = False
         self.ultimo_tiempo_deteccion = None
         self.robot_detenido = True  # Empieza detenido
+        self.en_modo_rotacion = False  # Estado de histéresis para rotación
         
         # Timer para verificar timeout de detección (10 Hz)
         self.timer_verificacion = self.create_timer(0.1, self.verificar_timeout)
         
         self.get_logger().info(
             f'✅ Navegador ArUco listo. Objetivo: {self.objetivo}, '
-            f'Zona muerta angular: {self.angular_deadband_deg}°, '
-            f'Goal tolerance: {self.tolerancia}m, Timeout: {self.timeout_deteccion}s'
+            f'Histéresis: entrar>{self.umbral_histeresis_entrar_deg}° / salir<{self.umbral_histeresis_salir_deg}°, '
+            f'Tolerancia objetivo: {self.tolerancia}m, Timeout: {self.timeout_deteccion}s'
         )
 
     def callback_posicion(self, msg):
@@ -101,9 +111,23 @@ class ArucoNavigator(Node):
             # Si theta < 0: caja rotada a la derecha respecto al robot
             angulo_orientacion = objetivo_theta
             
+            # HISTÉRESIS: Prevenir oscilación entre modos GIRANDO y AVANZANDO
+            # - Si NO estamos rotando: entrar a rotación si |theta| > umbral_entrar
+            # - Si YA estamos rotando: salir de rotación si |theta| < umbral_salir
+            abs_theta = abs(angulo_orientacion)
+            
+            if not self.en_modo_rotacion:
+                # Actualmente en modo avance -> verificar si debemos entrar a rotación
+                if abs_theta > self.umbral_histeresis_entrar_rad:
+                    self.en_modo_rotacion = True
+            else:
+                # Actualmente en modo rotación -> verificar si debemos salir a avance
+                if abs_theta < self.umbral_histeresis_salir_rad:
+                    self.en_modo_rotacion = False
+            
             # FASE 1: ALINEACIÓN - Girar SOLO sobre sí mismo (sin moverse)
             # Giro MUY LENTO para que cámara mantenga tracking
-            if abs(angulo_orientacion) > self.angular_deadband_rad:
+            if self.en_modo_rotacion:
                 # Robot desalineado -> SOLO girar, SIN movimiento XY
                 velocidad_angular = self.ganancia_angular * angulo_orientacion
                 velocidad_angular = max(-self.vel_angular_max, min(self.vel_angular_max, velocidad_angular))
@@ -138,8 +162,8 @@ class ArucoNavigator(Node):
             
             # Crear y publicar mensaje Twist
             cmd = Twist()
-            # INVERSIÓN: Cámara rotada 180° invierte solo X, no Y
-            cmd.linear.x = -velocidad_x
+            # Sin inversiones - la transformación en aruco_detector ya maneja las coordenadas correctamente
+            cmd.linear.x = velocidad_x
             cmd.linear.y = velocidad_y
             cmd.linear.z = 0.0
             cmd.angular.x = 0.0
@@ -153,6 +177,7 @@ class ArucoNavigator(Node):
                 f'🎯 Objetivo: ({objetivo_x:.2f}, {objetivo_y:.2f}) | '
                 f'Marco robot: X={marco_robot_x:.2f}m, Y={marco_robot_y:.2f}m | '
                 f'Dist: {distancia:.2f}m | Theta: {math.degrees(angulo_orientacion):.1f}° | '
+                f'ModoRot: {self.en_modo_rotacion} | '
                 f'{estado} | Cmd: vx={velocidad_x:.2f}, vy={velocidad_y:.2f}, w={velocidad_angular:.2f}'
             )
             

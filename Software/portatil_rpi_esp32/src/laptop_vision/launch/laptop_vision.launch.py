@@ -74,7 +74,9 @@ def generate_launch_description():
             'max_angular_speed': 0.5,     # Giro controlado para buen tracking
             'linear_p_gain': 2.5,         # Aumentado de 1.5 - necesario para generar vy > 0.31 (PWM_MIN=80)
             'angular_p_gain': 0.6,        # Ganancia angular suave
-            'angular_deadband_deg': 20.0, # Zona muerta amplia: solo gira si está muy desalineado
+            'angular_deadband_deg': 10.0, # DEPRECATED - usar histéresis en su lugar
+            'umbral_histeresis_entrar_deg': 20.0,  # Entrar a modo rotación si |theta| > 20°
+            'umbral_histeresis_salir_deg': 10.0,   # Salir de modo rotación si |theta| < 10°
             'goal_tolerance': 0.20,       # Reducido de 0.35m - acercarse más al objetivo
             'detection_timeout': 2.0      # Timeout de detección
         }]
