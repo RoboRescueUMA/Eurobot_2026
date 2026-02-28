@@ -1,0 +1,35 @@
+running egg_info
+creating build/xbox_controler/xbox_controler.egg-info
+writing build/xbox_controler/xbox_controler.egg-info/PKG-INFO
+writing dependency_links to build/xbox_controler/xbox_controler.egg-info/dependency_links.txt
+writing entry points to build/xbox_controler/xbox_controler.egg-info/entry_points.txt
+writing requirements to build/xbox_controler/xbox_controler.egg-info/requires.txt
+writing top-level names to build/xbox_controler/xbox_controler.egg-info/top_level.txt
+writing manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'
+reading manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'
+writing manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib/xbox_controler
+copying xbox_controler/__init__.py -> /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib/xbox_controler
+running install
+running install_lib
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler
+copying /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib/xbox_controler/__init__.py -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler
+byte-compiling /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler/__init__.py to __init__.cpython-310.pyc
+running install_data
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index/resource_index
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index/resource_index/packages
+copying resource/xbox_controler -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index/resource_index/packages
+copying package.xml -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/launch
+copying launch/xbox_launch.py -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/launch
+creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/config
+copying config/xbox.yaml -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/config
+running install_egg_info
+Copying build/xbox_controler/xbox_controler.egg-info to /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler-0.0.0-py3.10.egg-info
+running install_scripts
+writing list of installed files to '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/install.log'

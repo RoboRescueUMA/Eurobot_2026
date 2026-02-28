@@ -1,0 +1,21 @@
+[2.585s] Invoking command in '/home/axarbot/xbox_controller_rpi/xbox_controler': PYTHONPATH=/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/xbox_controler build --build-base /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build install --record /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/install.log --single-version-externally-managed install_data
+[3.561s] running egg_info
+[3.563s] writing build/xbox_controler/xbox_controler.egg-info/PKG-INFO
+[3.564s] writing dependency_links to build/xbox_controler/xbox_controler.egg-info/dependency_links.txt
+[3.565s] writing entry points to build/xbox_controler/xbox_controler.egg-info/entry_points.txt
+[3.566s] writing requirements to build/xbox_controler/xbox_controler.egg-info/requires.txt
+[3.567s] writing top-level names to build/xbox_controler/xbox_controler.egg-info/top_level.txt
+[3.574s] reading manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'
+[3.579s] writing manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'
+[3.579s] running build
+[3.580s] running build_py
+[3.581s] running install
+[3.582s] running install_lib
+[3.587s] running install_data
+[3.588s] copying config/xbox.yaml -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/config
+[3.589s] running install_egg_info
+[3.595s] removing '/home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler-0.0.0-py3.10.egg-info' (and everything under it)
+[3.597s] Copying build/xbox_controler/xbox_controler.egg-info to /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler-0.0.0-py3.10.egg-info
+[3.603s] running install_scripts
+[3.681s] writing list of installed files to '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/install.log'
+[3.797s] Invoked command in '/home/axarbot/xbox_controller_rpi/xbox_controler' returned '0': PYTHONPATH=/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/xbox_controler build --build-base /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build install --record /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/install.log --single-version-externally-managed install_data

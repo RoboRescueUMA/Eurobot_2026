@@ -1,0 +1,90 @@
+[0.000000] (-) TimerEvent: {}
+[0.001504] (xbox_controler) JobQueued: {'identifier': 'xbox_controler', 'dependencies': OrderedDict()}
+[0.001630] (xbox_controler) JobStarted: {'identifier': 'xbox_controler'}
+[0.099029] (-) TimerEvent: {}
+[0.199668] (-) TimerEvent: {}
+[0.300369] (-) TimerEvent: {}
+[0.401001] (-) TimerEvent: {}
+[0.501640] (-) TimerEvent: {}
+[0.602230] (-) TimerEvent: {}
+[0.702861] (-) TimerEvent: {}
+[0.803453] (-) TimerEvent: {}
+[0.904068] (-) TimerEvent: {}
+[1.004711] (-) TimerEvent: {}
+[1.105289] (-) TimerEvent: {}
+[1.206058] (-) TimerEvent: {}
+[1.306754] (-) TimerEvent: {}
+[1.407385] (-) TimerEvent: {}
+[1.507993] (-) TimerEvent: {}
+[1.608579] (-) TimerEvent: {}
+[1.709161] (-) TimerEvent: {}
+[1.809764] (-) TimerEvent: {}
+[1.910348] (-) TimerEvent: {}
+[2.010976] (-) TimerEvent: {}
+[2.111582] (-) TimerEvent: {}
+[2.212223] (-) TimerEvent: {}
+[2.312881] (-) TimerEvent: {}
+[2.413521] (-) TimerEvent: {}
+[2.514203] (-) TimerEvent: {}
+[2.614865] (-) TimerEvent: {}
+[2.715660] (-) TimerEvent: {}
+[2.834980] (-) TimerEvent: {}
+[2.935728] (-) TimerEvent: {}
+[3.036711] (-) TimerEvent: {}
+[3.137701] (-) TimerEvent: {}
+[3.238670] (-) TimerEvent: {}
+[3.339639] (-) TimerEvent: {}
+[3.440348] (-) TimerEvent: {}
+[3.541139] (-) TimerEvent: {}
+[3.599560] (xbox_controler) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', 'build/xbox_controler', 'build', '--build-base', '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build', 'install', '--record', '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/axarbot/xbox_controller_rpi/xbox_controler', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'USER': 'axarbot', 'SSH_CLIENT': '192.168.100.167 48786 22', 'LC_TIME': 'es_ES.UTF-8', 'XDG_SESSION_TYPE': 'tty', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib', 'MOTD_SHOWN': 'pam', 'HOME': '/home/axarbot', 'OLDPWD': '/home/axarbot/xbox_controller_rpi/xbox_controler/launch', 'SSH_TTY': '/dev/pts/0', 'ROS_PYTHON_VERSION': '3', 'LC_MONETARY': 'es_ES.UTF-8', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'ROS_DISTRO': 'humble', 'LOGNAME': 'axarbot', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'XDG_SESSION_ID': '1', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/home/axarbot/.local/bin:/home/axarbot/.opencode/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'LC_ADDRESS': 'es_ES.UTF-8', 'XDG_RUNTIME_DIR': '/run/user/1000', 'LANG': 'C.UTF-8', 'LC_TELEPHONE': 'es_ES.UTF-8', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'ROS_DOMAIN_ID': '17', 'AMENT_PREFIX_PATH': '/opt/ros/humble', 'SHELL': '/bin/bash', 'LC_NAME': 'es_ES.UTF-8', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'es_ES.UTF-8', 'LC_IDENTIFICATION': 'es_ES.UTF-8', 'PWD': '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler', 'LC_ALL': 'en_US.UTF-8', 'SSH_CONNECTION': '192.168.100.167 48786 192.168.100.14 22', 'XDG_DATA_DIRS': '/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'LC_NUMERIC': 'es_ES.UTF-8', 'LC_PAPER': 'es_ES.UTF-8', 'COLCON': '1'}, 'shell': False}
+[3.641308] (-) TimerEvent: {}
+[3.741962] (-) TimerEvent: {}
+[3.842710] (-) TimerEvent: {}
+[3.943498] (-) TimerEvent: {}
+[4.044517] (-) TimerEvent: {}
+[4.145134] (-) TimerEvent: {}
+[4.245711] (-) TimerEvent: {}
+[4.346330] (-) TimerEvent: {}
+[4.446999] (-) TimerEvent: {}
+[4.547606] (-) TimerEvent: {}
+[4.579554] (xbox_controler) StdoutLine: {'line': b'running egg_info\n'}
+[4.581789] (xbox_controler) StdoutLine: {'line': b'creating build/xbox_controler/xbox_controler.egg-info\n'}
+[4.582522] (xbox_controler) StdoutLine: {'line': b'writing build/xbox_controler/xbox_controler.egg-info/PKG-INFO\n'}
+[4.583630] (xbox_controler) StdoutLine: {'line': b'writing dependency_links to build/xbox_controler/xbox_controler.egg-info/dependency_links.txt\n'}
+[4.584148] (xbox_controler) StdoutLine: {'line': b'writing entry points to build/xbox_controler/xbox_controler.egg-info/entry_points.txt\n'}
+[4.584637] (xbox_controler) StdoutLine: {'line': b'writing requirements to build/xbox_controler/xbox_controler.egg-info/requires.txt\n'}
+[4.585096] (xbox_controler) StdoutLine: {'line': b'writing top-level names to build/xbox_controler/xbox_controler.egg-info/top_level.txt\n'}
+[4.585989] (xbox_controler) StdoutLine: {'line': b"writing manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'\n"}
+[4.593158] (xbox_controler) StdoutLine: {'line': b"reading manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'\n"}
+[4.596384] (xbox_controler) StdoutLine: {'line': b"writing manifest file 'build/xbox_controler/xbox_controler.egg-info/SOURCES.txt'\n"}
+[4.596968] (xbox_controler) StdoutLine: {'line': b'running build\n'}
+[4.597421] (xbox_controler) StdoutLine: {'line': b'running build_py\n'}
+[4.597948] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build\n'}
+[4.598543] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib\n'}
+[4.599015] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib/xbox_controler\n'}
+[4.599351] (xbox_controler) StdoutLine: {'line': b'copying xbox_controler/__init__.py -> /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib/xbox_controler\n'}
+[4.599791] (xbox_controler) StdoutLine: {'line': b'running install\n'}
+[4.600967] (xbox_controler) StdoutLine: {'line': b'running install_lib\n'}
+[4.603956] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler\n'}
+[4.604532] (xbox_controler) StdoutLine: {'line': b'copying /home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/build/lib/xbox_controler/__init__.py -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler\n'}
+[4.606958] (xbox_controler) StdoutLine: {'line': b'byte-compiling /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler/__init__.py to __init__.cpython-310.pyc\n'}
+[4.608243] (xbox_controler) StdoutLine: {'line': b'running install_data\n'}
+[4.608772] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index\n'}
+[4.609306] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index/resource_index\n'}
+[4.609734] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index/resource_index/packages\n'}
+[4.610049] (xbox_controler) StdoutLine: {'line': b'copying resource/xbox_controler -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/ament_index/resource_index/packages\n'}
+[4.610510] (xbox_controler) StdoutLine: {'line': b'copying package.xml -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler\n'}
+[4.611036] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/launch\n'}
+[4.611513] (xbox_controler) StdoutLine: {'line': b'copying launch/xbox_launch.py -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/launch\n'}
+[4.612206] (xbox_controler) StdoutLine: {'line': b'creating /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/config\n'}
+[4.612689] (xbox_controler) StdoutLine: {'line': b'copying config/xbox.yaml -> /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/share/xbox_controler/config\n'}
+[4.613150] (xbox_controler) StdoutLine: {'line': b'running install_egg_info\n'}
+[4.620298] (xbox_controler) StdoutLine: {'line': b'Copying build/xbox_controler/xbox_controler.egg-info to /home/axarbot/xbox_controller_rpi/xbox_controler/install/xbox_controler/lib/python3.10/site-packages/xbox_controler-0.0.0-py3.10.egg-info\n'}
+[4.625710] (xbox_controler) StdoutLine: {'line': b'running install_scripts\n'}
+[4.647777] (-) TimerEvent: {}
+[4.704558] (xbox_controler) StdoutLine: {'line': b"writing list of installed files to '/home/axarbot/xbox_controller_rpi/xbox_controler/build/xbox_controler/install.log'\n"}
+[4.748006] (-) TimerEvent: {}
+[4.819632] (xbox_controler) CommandEnded: {'returncode': 0}
+[4.848145] (-) TimerEvent: {}
+[4.886705] (xbox_controler) JobEnded: {'identifier': 'xbox_controler', 'rc': 0}
+[4.889198] (-) EventReactorShutdown: {}
