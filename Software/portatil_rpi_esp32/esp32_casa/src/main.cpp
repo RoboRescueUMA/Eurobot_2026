@@ -62,7 +62,7 @@ const int ch_M3 = 3;
 void controlar_motor(int id, float speed) {
   
   // 1. Convertir float (-1 a 1) a PWM (0 a 255)
-  int pwm_value = abs(speed) * 255;
+  int pwm_value = fabs(speed) * 255;
   if (pwm_value > 255) pwm_value = 255;
   
   // Umbral mínimo para evitar zumbidos (deadzone)
@@ -123,7 +123,7 @@ void subscription_callback(const void * msgin) {
   float speed_rr = x - y + z; // Trasera Der (Motor 1)
 
   // Normalizar si alguna velocidad supera 1.0 (para no perder proporción)
-  float max_val = max(abs(speed_fl), max(abs(speed_fr), max(abs(speed_rl), abs(speed_rr))));
+  float max_val = max(fabs(speed_fl), max(fabs(speed_fr), max(fabs(speed_rl), fabs(speed_rr))));
   if (max_val > 1.0) {
     speed_fl /= max_val;
     speed_fr /= max_val;
