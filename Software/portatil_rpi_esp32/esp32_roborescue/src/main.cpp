@@ -145,7 +145,7 @@ void set_motor(int channel, int dir_pin, float speed, bool invert_dir = false, c
   if (speed > 1.0) speed = 1.0;
   if (speed < -1.0) speed = -1.0;
 
-  int pwm = abs(speed) * 255;
+  int pwm = fabs(speed) * 255;
   
   // PWM MÍNIMO para vencer fricción (ajustado por pruebas empíricas)
   // Movimiento lateral requiere más PWM que movimiento adelante/atrás
@@ -205,7 +205,7 @@ void subscription_callback(const void * msgin) {
   fl *= 1.15;  // 15% más potencia para FL
 
   // Normalizar
-  float max_val = max(abs(fl), max(abs(fr), max(abs(rl), abs(rr))));
+  float max_val = max(fabs(fl), max(fabs(fr), max(fabs(rl), fabs(rr))));
   if (max_val > 1.0) {
     fl /= max_val; fr /= max_val; rl /= max_val; rr /= max_val;
   }
