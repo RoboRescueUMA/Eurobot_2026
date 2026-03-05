@@ -105,10 +105,11 @@ class ArucoNavigator(Node):
             marco_robot_x = objetivo_x
             marco_robot_y = objetivo_y  # SIN inversión, el detector ya da coordenadas correctas
             
-            # Usar orientación relativa (Theta) de los ArUcos en lugar de ángulo de posición
-            # objetivo_theta = orientación de la caja - orientación del robot
+            # Usar orientación relativa (Theta) entre las cajas para decidir si girar
+            # objetivo_theta = orientación de la caja objetivo - orientación del robot
             # Si theta > 0: caja rotada a la izquierda respecto al robot
             # Si theta < 0: caja rotada a la derecha respecto al robot
+            # Si theta ≈ 0: cajas alineadas -> moverse en diagonal con omniruedas
             angulo_orientacion = objetivo_theta
             
             # HISTÉRESIS: Prevenir oscilación entre modos GIRANDO y AVANZANDO

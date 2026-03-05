@@ -25,7 +25,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            # Aquí irán los ejecutables de tus propios nodos en Python en el futuro si los creas
+            'xbox_teleop = xbox_controler.xbox_teleop:main',
         ],
     },
 )

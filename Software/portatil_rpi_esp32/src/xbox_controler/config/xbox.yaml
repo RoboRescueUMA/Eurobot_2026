@@ -1,15 +1,10 @@
-teleop_twist_joy_node:
+xbox_teleop:
   ros__parameters:
-    axis_linear:
-      x: 1  # Avanzar/Retroceder
-      y: 0  # Desplazamiento lateral (Strafe)
-    axis_angular:
-      yaw: 3 # Giro sobre su eje
-    
-    scale_linear:
-      x: 1.0
-      y: -1.0
-    scale_angular:
-      yaw: -1.0
-
-    enable_button: 5  # Botón RB de seguridad
+    axis_linear_x: 1      # Stick izquierdo arriba/abajo (adelante/atrás)
+    axis_linear_y: 0      # Stick izquierdo izq/der (strafe lateral)
+    axis_angular_yaw: 2   # Stick derecho izq/der (giro)
+    enable_button: 7      # Botón RB de seguridad
+    scale_linear_x: 1.0
+    scale_linear_y: 1.0
+    scale_angular_yaw: 1.0
+    cmd_vel_topic: /roborescue/cmd_vel

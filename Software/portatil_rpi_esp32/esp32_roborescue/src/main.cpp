@@ -6,6 +6,14 @@
 #include <rclc/executor.h>
 #include <geometry_msgs/msg/twist.h>
 #include <std_msgs/msg/float32_multi_array.h>
+/*#include <WiFi.h>                                                   // Prueba wifi
+
+
+char ssid[] = "WifiIvan";
+char password[] = "12345678";
+IPAddress agent_ip(10, 42, 52, 254); // Usa comas en lugar de puntos
+size_t agent_port = 8888;
+*/
 
 // ================================================================
 //  CONFIGURACIÓN DE PINES - INTERCAMBIADOS FRENTE/ATRÁS
@@ -320,9 +328,19 @@ void setup() {
   // CONFIGURACIÓN MICRO-ROS CON DOMAIN ID Y NAMESPACE
   // ============================================================
   
+/*erial.print("Conectando a WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("✅ WiFi Conectado!");
+  Serial.print("Dirección IP de la ESP32: ");
+  Serial.println(WiFi.localIP()); // Esto te confirmará que el móvil le dio una IP
+  set_microros_wifi_transports(ssid, password, agent_ip, agent_port);
+*/
   // Configurar transporte micro-ROS
   set_microros_serial_transports(Serial);
-
   // A partir de aquí Serial está ocupado con micro-ROS — NO usar Serial.print
 
   // Inicialización Micro-ROS

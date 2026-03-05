@@ -71,12 +71,12 @@ def generate_launch_description():
         parameters=[{
             'target': target,
             'max_linear_speed': 0.25,     # Reducido de 0.4 para movimientos más controlados
-            'max_angular_speed': 0.5,     # Giro controlado para buen tracking
+            'max_angular_speed': 0.3,     # Reducido de 0.5 para giros más suaves
             'linear_p_gain': 2.5,         # Aumentado de 1.5 - necesario para generar vy > 0.31 (PWM_MIN=80)
-            'angular_p_gain': 0.6,        # Ganancia angular suave
+            'angular_p_gain': 0.3,        # Reducido de 0.6 para giros más suaves
             'angular_deadband_deg': 10.0, # DEPRECATED - usar histéresis en su lugar
-            'umbral_histeresis_entrar_deg': 20.0,  # Entrar a modo rotación si |theta| > 20°
-            'umbral_histeresis_salir_deg': 10.0,   # Salir de modo rotación si |theta| < 10°
+            'umbral_histeresis_entrar_deg': 15.0,  # Reducido de 20° - más permisivo
+            'umbral_histeresis_salir_deg': 5.0,    # Reducido de 10° - salir antes de rotación
             'goal_tolerance': 0.20,       # Reducido de 0.35m - acercarse más al objetivo
             'detection_timeout': 2.0      # Timeout de detección
         }]

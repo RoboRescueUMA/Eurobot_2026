@@ -3,6 +3,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+
 def generate_launch_description():
     config_filepath = os.path.join(
         get_package_share_directory('xbox_controler'),
@@ -17,15 +18,14 @@ def generate_launch_description():
         parameters=[{'deadzone': 0.1}]
     )
 
-    teleop_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
-        name='teleop_twist_joy_node',
-        parameters=[config_filepath],
-        remappings=[('/cmd_vel', '/roborescue/cmd_vel')] 
+    xbox_teleop_node = Node(
+        package='xbox_controler',
+        executable='xbox_teleop',
+        name='xbox_teleop',
+        parameters=[config_filepath]
     )
 
     return LaunchDescription([
         joy_node,
-        teleop_node
+        xbox_teleop_node
     ])

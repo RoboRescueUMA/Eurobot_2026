@@ -1,14 +1,14 @@
-# Troubleshooting - Registro de Problemas
+# Troubleshooting - Motores (Robot Casa - L298N)
 
-## 🤖 Robot Casa - L298N
+## Motor no retrocede
 
-### 2026-02-07: Motor 3 no retrocede
+### 2026-02-07: GPIO 16/17 son UART2
 
 **Síntoma:** Motor avanza pero no retrocede (zumba sin moverse)
 
 **Causa:** GPIO 16/17 son pines UART2 (RX2/TX2) con restricciones hardware
 
-**Solución:** Cambio de pines Motor 3
+**Solución:** Cambio de pines
 ```cpp
 // ANTES
 #define M3_IN3 16 // RX2
@@ -25,7 +25,9 @@
 
 ---
 
-### 2026-02-07: L298N requiere velocidades altas
+## Motores zumban pero no se mueven (L298N)
+
+### 2026-02-07: PWM insuficiente por caída de voltaje
 
 **Síntoma:** Con velocidad 0.3 motores zumban pero no se mueven
 
@@ -37,26 +39,16 @@
 
 ---
 
-## 📝 Referencia Rápida
+## Referencia - Drivers de Motores
 
-### GPIOs ESP32 para motores
+**L298N:** 
+- Requiere velocidades >0.8 (80%)
+- Caída de voltaje ~2V
+- Mejor para robots grandes con baterías de alto voltaje
 
-**❌ Evitar:**
-- GPIO 0, 2, 15 (boot)
-- GPIO 1, 3 (Serial)
-- GPIO 6-11 (Flash)
-- GPIO 16, 17 (UART2)
+**DFRobot:** 
+- Funciona con velocidades >0.3 (30%)
+- Menor caída de voltaje
+- Mejor para robots pequeños
 
-**✅ Recomendados:**
-- GPIO 18, 19, 21, 22, 23
-- GPIO 25, 26, 27, 32, 33
-- GPIO 4, 5, 12, 13, 14
-
-### Drivers
-
-**L298N:** Requiere velocidades >0.8 (caída 2V)  
-**DFRobot:** Funciona con velocidades >0.3 (menor caída)
-
----
-
-**Última actualización:** 2026-02-07
+**Última actualización:** 2026-02-24

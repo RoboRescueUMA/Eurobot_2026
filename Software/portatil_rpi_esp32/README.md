@@ -31,18 +31,24 @@ Este proyecto implementa un robot autónomo con arquitectura distribuida para co
 ```
 laptop_rpi_esp/
 ├── docs/                         # Documentación del proyecto
-│   ├── reglamento/              # Reglamento oficial Eurobot 2026
-│   │   ├── EurobotSenior_general.pdf
-│   │   ├── Arena y puntuaciones.pdf
-│   │   └── RESUMEN_REGLAMENTO.md
-│   ├── hardware/                # Especificaciones técnicas del hardware
-│   │   └── ESPECIFICACIONES_HARDWARE.md
+│   ├── guias/                   # Guías de uso
+│   │   ├── GUIA_VISION_DISTRIBUIDA.md    # Sistema de visión con ArUco
+│   │   ├── GUIA_PRUEBAS_ROBOT.md         # Comandos de prueba
+│   │   └── INSTALACION_DEPENDENCIAS.md   # Dependencias externas
+│   ├── troubleshooting/         # Solución de problemas
+│   │   ├── encoders.md          # Problemas con encoders
+│   │   ├── micro-ros.md         # Problemas con micro-ROS
+│   │   ├── esp32-flash.md       # Problemas subiendo código a ESP32
+│   │   └── motores.md           # Problemas con motores
+│   ├── hardware/                # Especificaciones técnicas
+│   │   ├── ESPECIFICACIONES_HARDWARE.md
+│   │   └── CONEXION_ENCODERS.md
 │   ├── architecture/            # Diagramas de arquitectura
 │   │   └── ARQUITECTURA_SISTEMA.md
-│   ├── GUIA_VISION_DISTRIBUIDA.md    # Guía rápida del sistema de visión
-│   ├── INSTALACION_DEPENDENCIAS.md   # Instalación de dependencias externas
-│   ├── GUIA_PRUEBAS_ROBOT.md         # Comandos de prueba
-│   └── TROUBLESHOOTING.md            # Problemas y soluciones
+│   └── reglamento/              # Reglamento oficial Eurobot 2026
+│       ├── EurobotSenior_general.pdf
+│       ├── Arena y puntuaciones.pdf
+│       └── RESUMEN_REGLAMENTO.md
 ├── src/                         # Paquetes ROS2
 │   ├── laptop_vision/          # 🆕 Sistema de visión distribuida (Laptop)
 │   │   ├── camera_publisher.py      # Captura de cámara IP
@@ -106,9 +112,12 @@ laptop_rpi_esp/
 - **max_angular_speed:** 0.5 rad/s
 - **linear_p_gain:** 2.5 (necesario para generar velocidad > PWM_MIN)
 - **angular_p_gain:** 0.6
-- **angular_deadband:** 20° (gira en sitio si desalineación > 20°)
+- **Histéresis angular:**
+  - Umbral entrar: 20° (entra en modo rotación)
+  - Umbral salir: 10° (sale de modo rotación)
 - **goal_tolerance:** 0.20 m (distancia de parada al objetivo)
 - **PWM_MIN:** 80 (~0.31 m/s - necesario para vencer fricción estática)
+- **Encoders:** Habilitados (11 PPR motor × 34 reducción = 374 PPR rueda, cuadratura ×4 = 1496 counts/rev)
 
 ---
 
@@ -137,7 +146,7 @@ colcon build --packages-select laptop_vision rpi_relay
 source install/setup.bash
 ```
 
-**Nota:** Ver `docs/INSTALACION_DEPENDENCIAS.md` para detalles completos de todas las dependencias externas.
+**Nota:** Ver `docs/guias/INSTALACION_DEPENDENCIAS.md` para detalles completos de todas las dependencias externas.
 
 ### 2. Configurar micro-ROS en Raspberry Pi
 
@@ -244,7 +253,7 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 ros2 run rpi_relay cmd_vel_relay
 ```
 
-**Ver:** `docs/GUIA_VISION_DISTRIBUIDA.md` para guía detallada y configuración de ArUco markers.
+**Ver:** `docs/guias/GUIA_VISION_DISTRIBUIDA.md` para guía detallada y configuración de ArUco markers.
 
 #### 📍 Colocación de Marcadores ArUco (IMPORTANTE)
 
@@ -336,6 +345,19 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 
 ---
 
+### Verificar Encoders
+
+```bash
+# Ver velocidades de encoders (FL, FR, RL, RR en RPM)
+export ROS_DOMAIN_ID=17
+ros2 topic echo /roborescue/encoder_velocities
+```
+
+**Ver guía completa de pruebas:** `docs/hardware/CONEXION_ENCODERS.md`  
+**Troubleshooting:** `docs/troubleshooting/encoders.md`
+
+---
+
 ## Arquitectura del Sistema
 
 ```
@@ -403,10 +425,14 @@ ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
 
 ### Documentación del Sistema
 
-- 👁️ [**Guía del Sistema de Visión Distribuida**](docs/GUIA_VISION_DISTRIBUIDA.md) - Uso del sistema de visión con ArUco
-- 📦 [**Instalación de Dependencias**](docs/INSTALACION_DEPENDENCIAS.md) - Guía completa de dependencias externas
-- 🧪 [**Guía de Pruebas**](docs/GUIA_PRUEBAS_ROBOT.md) - Comandos de prueba para Robot Casa y RoboRescue
-- 🔧 [**Troubleshooting**](docs/TROUBLESHOOTING.md) - Problemas comunes y soluciones
+- 👁️ [**Guía del Sistema de Visión Distribuida**](docs/guias/GUIA_VISION_DISTRIBUIDA.md) - Uso del sistema de visión con ArUco
+- 📦 [**Instalación de Dependencias**](docs/guias/INSTALACION_DEPENDENCIAS.md) - Guía completa de dependencias externas
+- 🧪 [**Guía de Pruebas**](docs/guias/GUIA_PRUEBAS_ROBOT.md) - Comandos de prueba para Robot Casa y RoboRescue
+- 🔧 [**Troubleshooting**](docs/troubleshooting/) - Problemas comunes y soluciones por categoría
+  - [Encoders](docs/troubleshooting/encoders.md)
+  - [micro-ROS](docs/troubleshooting/micro-ros.md)
+  - [ESP32 Flash](docs/troubleshooting/esp32-flash.md)
+  - [Motores](docs/troubleshooting/motores.md)
 
 ### Documentación del Proyecto
 
