@@ -18,21 +18,31 @@ laptop_rpi_esp/
 │       └── ARQUITECTURA_SISTEMA.md      # ⭐ Diagramas del sistema
 │
 ├── src/                                # 🤖 PAQUETES ROS2
-│   ├── robot_vision/                   # Visión (portátil)
-│   │   ├── src/
-│   │   │   ├── aruco_detector.py
-│   │   │   └── aruco_follower.py
+│   ├── robot_localization/             # 📍 Localización + Navegación (NUEVO)
+│   │   ├── robot_localization/
+│   │   │   ├── camera_publisher.py     # Captura cámara IP
+│   │   │   ├── field_localizer.py      # Homografía + poses absolutas (NUEVO)
+│   │   │   └── aruco_navigator.py      # Navegación (por implementar)
 │   │   ├── launch/
-│   │   ├── CMakeLists.txt
-│   │   └── package.xml
-│   └── robot_navigator/                # Navegación (RPI4)
-│       ├── robot_navigator/
-│       │   ├── aruco_controller.py
-│       │   ├── aruco_detector.py
-│       │   ├── aruco_detector_mov.py
-│       │   └── zenital_publisher.py
-│       ├── package.xml
-│       └── setup.py
+│   │   │   └── robot_localization.launch.py
+│   │   ├── config/
+│   │   │   └── robot_localization.yaml
+│   │   ├── package.xml
+│   │   └── setup.py
+│   ├── laptop_vision/                  # 👁️ Visión relativa (ANTIGUO)
+│   │   ├── launch/
+│   │   ├── config/
+│   │   ├── package.xml
+│   │   └── setup.py
+│   ├── rpi_relay/                      # 🔗 Relay de comandos (RPI4)
+│   │   ├── rpi_relay/
+│   │   │   └── cmd_vel_relay.py
+│   │   ├── package.xml
+│   │   └── setup.py
+│   ├── robot_vision/                   # (ANTIGUO - Backup)
+│   │   └── ...
+│   └── robot_navigator/                # (ANTIGUO - Backup)
+│       └── ...
 │
 ├── esp32_roborescue/                   # 🏆 ROBOT COMPETICIÓN (DFRobot)
 │   ├── README.md                       # ⭐ Documentación específica
@@ -72,6 +82,15 @@ laptop_rpi_esp/
 - `docs/hardware/ESPECIFICACIONES_HARDWARE.md` - Hardware del robot
 - `docs/architecture/ARQUITECTURA_SISTEMA.md` - Cómo funciona todo
 
+### 📍 Nuevo Sistema de Localización (Actual)
+- `docs/guias/GUIA_ROBOT_LOCALIZATION.md` - Guía de homografía y localización absoluta
+- `src/robot_localization/` - Paquete de localización con poses absolutas
+- `src/robot_localization/robot_localization/field_localizer.py` - Nodo principal
+
+### 👁️ Sistema Anterior (Referencia)
+- `docs/guias/GUIA_VISION_DISTRIBUIDA.md` - Guía del sistema de visión relativa
+- `src/laptop_vision/` - Código anterior
+
 ### 🏆 Trabajar con robot de competición
 - `esp32_roborescue/README.md` - Instrucciones específicas
 - `esp32_roborescue/src/main.cpp` - Código ESP32 DFRobot
@@ -79,10 +98,6 @@ laptop_rpi_esp/
 ### 🏠 Trabajar con robot de pruebas
 - `esp32_casa/README.md` - Instrucciones específicas
 - `esp32_casa/src/main.cpp` - Código ESP32 L298N
-
-### 🤖 Programar ROS2
-- `src/robot_vision/` - Código de visión
-- `src/robot_navigator/` - Código de navegación
 
 ### 🔍 Comparar robots
 - `docs/hardware/COMPARATIVA_ROBOTS.md` - Diferencias detalladas

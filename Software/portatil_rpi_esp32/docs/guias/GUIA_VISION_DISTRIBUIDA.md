@@ -1,5 +1,9 @@
 # Sistema de Visión Distribuida - Guía Rápida
 
+⚠️ **NOTA:** Este es el sistema ANTERIOR. El sistema nuevo usa **localización absoluta con homografía**. Ver `GUIA_ROBOT_LOCALIZATION.md` para el sistema actual.
+
+---
+
 ## Arquitectura
 
 ```

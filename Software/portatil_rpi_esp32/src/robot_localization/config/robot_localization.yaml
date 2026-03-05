@@ -1,0 +1,28 @@
+# robot_localization - Configuración por defecto
+# Sobrescribir con: ros2 launch robot_localization robot_localization.launch.py camera_ip:=<IP>
+
+zenital_camera_publisher:
+  ros__parameters:
+    video_url: "http://192.168.100.122:5000/video"
+    publish_rate: 10.0      # Hz - tasa de publicación de imagen
+    jpeg_quality: 80        # Calidad JPEG para imagen comprimida (0-100)
+
+field_localizer:
+  ros__parameters:
+    # IDs ArUco del robot y objetos móviles
+    robot_id: 1
+    blue_box_id: 36
+    yellow_box_id: 47
+
+    # IDs ArUco fijos en las esquinas del campo
+    # Orden: [sup_izq, sup_der, inf_izq, inf_der]
+    # sup_izq = origen (0,0), sup_der = (300,0), inf_izq = (0,200), inf_der = (300,200)
+    fixed_ids: [20, 21, 22, 23]
+
+    # Dimensiones del campo en cm (Eurobot 2026)
+    field_width_cm: 300.0   # X: de izquierda a derecha
+    field_height_cm: 200.0  # Y: de arriba a abajo
+
+    # Cada cuántos frames se intenta recalcular la homografía (si los 4 fijos son visibles)
+    # 30 frames @ 10Hz = cada 3 segundos
+    homography_update_every_n_frames: 30

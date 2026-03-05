@@ -50,12 +50,19 @@ laptop_rpi_esp/
 │       ├── Arena y puntuaciones.pdf
 │       └── RESUMEN_REGLAMENTO.md
 ├── src/                         # Paquetes ROS2
-│   ├── laptop_vision/          # 🆕 Sistema de visión distribuida (Laptop)
-│   │   ├── camera_publisher.py      # Captura de cámara IP
-│   │   ├── aruco_detector.py        # Detección de ArUco markers
-│   │   ├── aruco_navigator.py       # Control proporcional de navegación
-│   │   ├── launch/                  # Launch files
-│   │   └── config/camera.yaml       # Configuración de cámara
+│   ├── robot_localization/     # 🆕 Localización + Navegación (Laptop)
+│   │   ├── robot_localization/
+│   │   │   ├── camera_publisher.py        # Captura de cámara IP cenital
+│   │   │   ├── field_localizer.py         # Detección ArUco + Homografía (poses absolutas)
+│   │   │   └── aruco_navigator.py (futura) # Navegación en campo (por implementar)
+│   │   ├── launch/
+│   │   │   └── robot_localization.launch.py
+│   │   ├── config/
+│   │   │   └── robot_localization.yaml
+│   │   ├── package.xml
+│   │   └── setup.py
+│   ├── laptop_vision/          # (Antiguo - mantener como referencia histórica)
+│   │   └── (código anterior de visión relativa)
 │   ├── rpi_relay/              # 🆕 Relay de comandos (RPI4)
 │   │   └── cmd_vel_relay.py         # Reenvía /roborescue/cmd_vel_laptop → /roborescue/cmd_vel
 │   ├── robot_vision/           # (Antiguo - backup)
@@ -100,11 +107,18 @@ laptop_rpi_esp/
 - **ROS_DOMAIN_ID:** 17 (evita conflictos con otros robots)
 - **Namespace:** `roborescue`
 - **Cámara IP:** `10.16.250.84:5000`
-- **ArUco IDs:**
+- **Sistema de Localización:** Homografía con 4 ArUcos fijos en esquinas del campo
+- **ArUco IDs (Fijos - Campo):**
+  - Esquina sup-izq: 20 → (0, 0) cm
+  - Esquina sup-der: 21 → (300, 0) cm
+  - Esquina inf-izq: 22 → (0, 200) cm
+  - Esquina inf-der: 23 → (300, 200) cm
+- **ArUco IDs (Móviles):**
   - Robot: 1
   - Caja azul: 36
   - Caja amarilla: 47
 - **Diccionario ArUco:** DICT_4X4_50
+- **Tamaño campo:** 300 cm × 200 cm (Eurobot 2026)
 
 ### Parámetros de Navegación (Actuales)
 
@@ -203,11 +217,11 @@ pio run --target upload
 
 ## Uso
 
-### Sistema de Visión Distribuida (Recomendado)
+### Sistema de Localización y Navegación (NUEVO - Recomendado)
 
-Este es el sistema actualmente en uso que implementa visión zenital con ArUco markers.
+Este es el sistema actual que implementa **localización absoluta en el campo** mediante homografía con 4 ArUcos fijos en las esquinas, seguida de **navegación autónoma** hacia objetivos.
 
-#### En Portátil (Sistema de Visión):
+#### En Portátil (Sistema de Localización):
 
 ```bash
 cd ~/Desktop/GitHub/pruebas_eurobot
@@ -216,26 +230,15 @@ source install/setup.bash
 # IMPORTANTE: Configurar ROS_DOMAIN_ID=17
 export ROS_DOMAIN_ID=17
 
-# Configurar el IP de la cámara (app IPCamera en móvil)
-# IP actual: 10.16.250.84:5000
-
-# Opción 1: Navegar hacia caja azul
-ros2 launch laptop_vision laptop_vision.launch.py \
-  camera_ip:=10.16.250.84:5000 \
-  target:=blue_box
-
-# Opción 2: Navegar hacia caja amarilla
-ros2 launch laptop_vision laptop_vision.launch.py \
-  camera_ip:=10.16.250.84:5000 \
-  target:=yellow_box
+# Lanzar: Publicador de cámara IP + Localizador de campo con homografía
+ros2 launch robot_localization robot_localization.launch.py \
+  camera_ip:=10.16.250.84:5000
 
 # Ver imagen con detecciones en tiempo real
-# Opción A: Video con anotaciones ArUco
 ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
-
-# Opción B: Video comprimido (mejor rendimiento por WiFi)
-ros2 run rqt_image_view rqt_image_view /roborescue/zenital/image_raw/compressed
 ```
+
+**Ver:** `docs/guias/GUIA_ROBOT_LOCALIZATION.md` para guía detallada de la homografía y localización absoluta.
 
 #### En Raspberry Pi 4 (Relay + micro-ROS):
 
@@ -253,55 +256,47 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 ros2 run rpi_relay cmd_vel_relay
 ```
 
-**Ver:** `docs/guias/GUIA_VISION_DISTRIBUIDA.md` para guía detallada y configuración de ArUco markers.
+---
 
-#### 📍 Colocación de Marcadores ArUco (IMPORTANTE)
+### Sistema Anterior - Visión Relativa (Backup)
 
-El sistema de visión detecta tanto **posición** como **orientación** de los marcadores ArUco usando la esquina 0 como referencia.
+#### 📍 Marcadores ArUco - Configuración Nuevo Sistema
 
-**Marcadores necesarios:**
-- **ID=1** - Robot (sobre el robot móvil)
-- **ID=36** - Caja azul (objetivo)
-- **ID=47** - Caja amarilla (objetivo)
+El sistema de localización detecta posiciones **absolutas en el campo** usando 4 ArUcos fijos como referencia.
 
-**Cómo identificar la esquina 0:**
-1. Lanzar el sistema con visualización debug:
-   ```bash
-   ros2 run rqt_image_view rqt_image_view /roborescue/zenital/debug
-   ```
-2. La **esquina 0** se muestra con un **círculo rojo** en la imagen
-3. Una **flecha verde/azul/amarilla** indica la orientación del marcador (desde centro → esquina 0)
+**Marcadores fijos (esquinas del campo):**
+- **ID=20** - Esquina superior-izquierda (origen: 0, 0 cm)
+- **ID=21** - Esquina superior-derecha (300, 0 cm)
+- **ID=22** - Esquina inferior-izquierda (0, 200 cm)
+- **ID=23** - Esquina inferior-derecha (300, 200 cm)
 
-**Colocación correcta en el robot:**
+**Marcadores móviles:**
+- **ID=1** - Robot (se detecta en coordenadas absolutas del campo)
+- **ID=36** - Caja azul (coordenadas absolutas)
+- **ID=47** - Caja amarilla (coordenadas absolutas)
 
-```
-        Adelante del robot
-              ↑
-              │
-    ┌─────────────────┐
-    │    ArUco ID=1   │
-    │                 │
-    │   ┌─────────┐   │
-    │   │ ● ───── │   │ ← Esquina 0 apuntando ADELANTE
-    │   │ │       │   │
-    │   │ │   1   │   │
-    │   │ └───────┘   │
-    │                 │
-    └─────────────────┘
-```
+**Colocación correcta:**
+
+1. **Los 4 ArUcos fijos** deben estar colocados en las esquinas del campo de forma que:
+   - El área vista por la cámara zenital es la del campo (300×200 cm)
+   - Los 4 ArUcos están claramente visibles desde el inicio
+
+2. **El ArUco del robot (ID=1)** debe estar:
+   - Alineado de forma que su esquina 0 apunte hacia **adelante del robot**
+   - Esto se visualiza en el debug como una flecha/círculo rojo que marca la dirección
+   - La orientación se publica en `theta` (en grados) del topic `/roborescue/robot_pose`
 
 **Verificación:**
-- En la imagen debug, la **flecha verde** del marcador ID=1 debe apuntar hacia **adelante del robot**
-- Si la flecha apunta en otra dirección, rotar el marcador ArUco hasta que esté correcta
-- El sistema usa esta orientación para calcular el error angular del robot
-
-**Nota:** Las cajas (ID=2, ID=3) no requieren orientación específica, solo el robot necesita tener la esquina 0 correctamente alineada.
+- En la imagen debug (`/roborescue/zenital/debug`), deberías ver:
+  - Los 4 ArUcos fijos etiquetados como "F20", "F21", "F22", "F23"
+  - El ArUco del robot etiquetado como "ROBOT" con posición en cm y ángulo
+  - Las cajas etiquetadas como "AZUL" y "AMARILLA" con posiciones absolutas
 
 ---
 
 ### Sistema Anterior (Backup)
 
-Los paquetes `robot_vision` y `robot_navigator` son versiones anteriores del sistema.
+Los paquetes `laptop_vision`, `robot_vision` y `robot_navigator` son versiones anteriores del sistema que usaban **visión relativa** (posiciones relativas al robot, no absolutas en el campo).
 
 #### En Raspberry Pi 4:
 
@@ -317,7 +312,7 @@ ros2 launch robot_navigator eurobot_launch.py
 
 ```bash
 # Terminal 1: Procesamiento de visión
-ros2 launch robot_vision camera_launch.py
+ros2 launch laptop_vision laptop_vision.launch.py camera_ip:=10.16.250.84:5000 target:=blue_box
 
 # Terminal 2: Monitoreo (opcional)
 ros2 run rqt_image_view rqt_image_view
@@ -331,11 +326,11 @@ ros2 run rqt_image_view rqt_image_view
 # Ver topics activos
 ros2 topic list
 
-# Monitorear velocidades enviadas a ESP32
-ros2 topic echo /cmd_vel
+# Monitorear comandos de velocidad
+ros2 topic echo /roborescue/cmd_vel
 
-# Ver posiciones detectadas
-ros2 topic echo /roborescue/robot_pose
+# Ver posiciones ABSOLUTAS detectadas (nuevo sistema)
+ros2 topic echo /roborescue/robot_pose         # X, Y en cm, theta en grados
 ros2 topic echo /roborescue/blue_box_pose
 ros2 topic echo /roborescue/yellow_box_pose
 
@@ -368,64 +363,77 @@ ros2 topic echo /roborescue/encoder_velocities
   ┌─────────────────────┐        ┌─────────────────────┐        ┌──────────────────┐
   │   PORTÁTIL (WiFi)   │        │   RPI4 (Ethernet)   │        │  ESP32 (Serial)  │
   │                     │        │                     │        │                  │
-  │  laptop_vision      │        │   rpi_relay         │        │  micro-ROS       │
+  │  robot_localization │        │   rpi_relay         │        │  micro-ROS       │
   │  ├─ camera_pub      │        │   ├─ cmd_vel_relay  │        │  ├─ Cinemática   │
-  │  ├─ aruco_detect◄───┼────────┼──►│   (relay with   │        │  │   Mecanum      │
-  │  └─ aruco_nav       │  ROS2  │   │    namespace)   │        │  └─ Control PWM  │
-  │                     │  WiFi  │   └─────────┬───────┼────────┼──────PWM_MIN=80──►
-  │  Publicadores:      │  DDS   │             │       │ Serial │                  │
-  │  /roborescue/       │        │  /roborescue│       │ micro- │   Suscriptor:    │
-  │    zenital/*        │        │  /cmd_vel_  │       │  ROS   │  /roborescue/    │
-  │  /roborescue/       │        │   laptop    │       │        │    cmd_vel       │
-  │    *_pose           │        │      ↓      │       │        │                  │
-  │  /roborescue/       │        │  /roborescue│       │        │                  │
-  │    cmd_vel_laptop   │        │   /cmd_vel  │       │        │                  │
-  └──────────┬──────────┘        └─────────────┘       │        └────────┬─────────┘
-             │                   └─────────────┘       │                 │
+  │  └─ field_local     │        │   │    (relay with   │        │  │   Mecanum      │
+  │     (homografía     │        │   │    namespace)    │        │  └─ Control PWM  │
+  │      poses abs)     │  ROS2  │   └─────────┬───────┼────────┼──────PWM_MIN=80──►
+  │                     │  WiFi  │             │       │ Serial │                  │
+  │  Publicadores:      │  DDS   │  /roborescue│       │ micro- │   Suscriptor:    │
+  │  /roborescue/       │        │  /cmd_vel_  │       │  ROS   │  /roborescue/    │
+  │    zenital/*        │        │   laptop    │       │        │    cmd_vel       │
+  │  /roborescue/       │        │      ↓      │       │        │                  │
+  │    *_pose (ABS)     │        │  /roborescue│       │        │                  │
+  │  /roborescue/       │        │   /cmd_vel  │       │        │                  │
+  │    cmd_vel_laptop   │        └─────────────┘       │        └────────┬─────────┘
+  └──────────┬──────────┘        └─────────────┘       │                 │
              │                                         │                 │
       Cámara IP (móvil)                         micro_ros_agent    4x Motores DC
-      ArUco tracking                            (ROS2↔micro-ROS)   + 2x Drivers
+      Homografía + ArUcos                       (ROS2↔micro-ROS)   + 2x Drivers
       (10.16.250.84:5000)                       bridge process     (Ruedas Mecanum)
+
+NUEVO: Coordenadas ABSOLUTAS del campo (cm)
+       - Origen: esquina sup-izq (ArUco 20)
+       - X+ = derecha, Y+ = abajo
+       - 4 ArUcos fijos en esquinas (IDs 20-23)
 ```
 
 ### Flujo de Datos Completo
 
 1. **Cámara IP** (móvil con IPCamera app) → Stream video vía WiFi
 2. **Portátil** recibe stream → `camera_publisher` publica en `/roborescue/zenital/image_raw`
-3. **Portátil** `aruco_detector` procesa imagen → Detecta ArUco markers (Robot ID=1, Cajas) con posición y orientación
-4. **Portátil** `aruco_detector` calcula posiciones y orientaciones relativas → Publica en `/roborescue/*_pose` (Pose2D: x, y, theta)
-5. **Portátil** `aruco_navigator` recibe poses → Calcula velocidades usando orientación ArUco (control proporcional)
-6. **Portátil** `aruco_navigator` publica comandos → `/roborescue/cmd_vel_laptop` (Twist)
+3. **Portátil** `field_localizer` (NUEVO):
+   - Detecta los 4 ArUcos fijos en las esquinas (IDs 20-23)
+   - Calcula homografía píxeles → cm del campo
+   - Transforma posiciones de robot y cajas a coordenadas ABSOLUTAS del campo
+4. **Portátil** publica poses ABSOLUTAS:
+   - `/roborescue/robot_pose` → X, Y en cm, theta en grados
+   - `/roborescue/blue_box_pose`, `/roborescue/yellow_box_pose`
+5. **Portátil** `aruco_navigator` (por implementar) → Recibirá poses absolutas, calculará velocidades
+6. **Portátil** publica comandos → `/roborescue/cmd_vel_laptop` (Twist)
 7. **RPI4** `cmd_vel_relay` reenvía → `/roborescue/cmd_vel_laptop` → `/roborescue/cmd_vel`
 8. **ESP32** recibe vía micro-ROS → `/roborescue/cmd_vel` (Twist)
 9. **ESP32** calcula cinemática inversa → Velocidades individuales de 4 ruedas Mecanum
-10. **ESP32** envía PWM → 4 motores DC → Robot se mueve omnidireccionalmente
+10. **ESP32** envía PWM → 4 motores DC → Robot se mueve
 
 ### Topics ROS2 Principales
 
-**Laptop publica:**
+**Laptop publica (robot_localization):**
 - `/roborescue/zenital/image_raw` - Video cámara (Image)
 - `/roborescue/zenital/image_raw/compressed` - Video comprimido (CompressedImage)
-- `/roborescue/zenital/debug` - Video con anotaciones ArUco (Image)
-- `/roborescue/robot_pose` - Posición y orientación del robot, siempre (0, 0, 0) como referencia (Pose2D)
-- `/roborescue/blue_box_pose` - Posición y orientación relativa de caja azul ID=36 (Pose2D)
-- `/roborescue/yellow_box_pose` - Posición y orientación relativa de caja amarilla ID=47 (Pose2D)
-- `/roborescue/cmd_vel_laptop` - Comandos de velocidad (Twist)
+- `/roborescue/zenital/debug` - Video con anotaciones (Image)
+- `/roborescue/robot_pose` - **Posición ABSOLUTA en cm + orientación en grados** (Pose2D: x, y, theta)
+- `/roborescue/blue_box_pose` - **Posición ABSOLUTA en cm + orientación** (Pose2D)
+- `/roborescue/yellow_box_pose` - **Posición ABSOLUTA en cm + orientación** (Pose2D)
+- `/roborescue/cmd_vel_laptop` - Comandos de velocidad (Twist) [por implementar: aruco_navigator]
 
 **RPI4 relay:**
 - Suscribe: `/roborescue/cmd_vel_laptop` (Twist)
 - Publica: `/roborescue/cmd_vel` (Twist) - Para ESP32 vía micro-ROS
 
 **ESP32 suscribe:**
-- `/roborescue/cmd_vel` (Twist) - Velocidades lineales (x, y) y angular (theta)
+- `/roborescue/cmd_vel` (Twist) - Velocidades lineales (x, y) y angular (z)
 
 ---
 
 ## Documentación Adicional
 
+### Documentación Adicional
+
 ### Documentación del Sistema
 
-- 👁️ [**Guía del Sistema de Visión Distribuida**](docs/guias/GUIA_VISION_DISTRIBUIDA.md) - Uso del sistema de visión con ArUco
+- 📍 [**Guía de Localización Absoluta (Homografía)**](docs/guias/GUIA_ROBOT_LOCALIZATION.md) - **NUEVO**: Sistema con coordenadas absolutas del campo
+- 👁️ [**Guía del Sistema de Visión Distribuida**](docs/guias/GUIA_VISION_DISTRIBUIDA.md) - Sistema anterior (visión relativa)
 - 📦 [**Instalación de Dependencias**](docs/guias/INSTALACION_DEPENDENCIAS.md) - Guía completa de dependencias externas
 - 🧪 [**Guía de Pruebas**](docs/guias/GUIA_PRUEBAS_ROBOT.md) - Comandos de prueba para Robot Casa y RoboRescue
 - 🔧 [**Troubleshooting**](docs/troubleshooting/) - Problemas comunes y soluciones por categoría
@@ -483,10 +491,9 @@ ros2 topic echo /roborescue/encoder_velocities
 
 #### 🔄 En Progreso
 
+- [ ] **Implementar aruco_navigator dentro de robot_localization** - Navegación hacia objetivos usando poses absolutas
 - [ ] **Pruebas en arena de competición** - Validar navegación en superficie plana de competencia
-- [ ] **Mapeo proporcional de PWM** - Implementar PWM 60-255 proporcional en vez de umbral fijo PWM_MIN=80
 - [ ] **Filtrado de posiciones ArUco** - Aplicar promedio móvil para reducir jitter de detección
-- [ ] **Cálculo de distancia 2D** - Ignorar diferencia de altura entre ArUcos (proyección en plano XY)
 
 #### 📋 Pendientes
 

@@ -4,9 +4,16 @@
 
 El sistema está diseñado con una **arquitectura distribuida** de tres niveles que separa las responsabilidades por capacidad computacional y función:
 
-1. **Portátil** - Procesamiento intensivo de visión
-2. **Raspberry Pi 4** - Coordinación y control de alto nivel
+1. **Portátil** - Procesamiento de visión (localización + navegación)
+2. **Raspberry Pi 4** - Relay de comandos y comunicación
 3. **ESP32** - Control de bajo nivel y actuadores
+
+### Sistema Actual: Localización Absoluta con Homografía
+
+El sistema implementa **localización absoluta en el campo** mediante:
+- 4 ArUcos fijos en las esquinas del campo como referencia (IDs 20-23)
+- Cálculo de homografía píxeles ↔ coordenadas reales del campo
+- Transformación de posiciones/orientaciones a sistema global (X, Y en cm)
 
 ---
 
@@ -14,50 +21,52 @@ El sistema está diseñado con una **arquitectura distribuida** de tres niveles 
 
 ```
 ╔════════════════════════════════════════════════════════════════════╗
-║                    ARQUITECTURA DEL SISTEMA                        ║
+║              ARQUITECTURA DEL SISTEMA (CON HOMOGRAFÍA)             ║
 ╚════════════════════════════════════════════════════════════════════╝
 
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         NIVEL DE PERCEPCIÓN                          │
-│                           (PORTÁTIL)                                 │
+│                      NIVEL DE PERCEPCIÓN                             │
+│                        (PORTÁTIL)                                    │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐  │
-│  │  Cámara IP  │────►│  Nodo OpenCV     │────►│ Nodo Detector   │  │
+│  │  Cámara IP  │────►│  Nodo OpenCV     │────►│ Nodo Localiza   │  │
 │  │  (Ethernet/ │     │  - Captura       │     │ ArUco           │  │
-│  │   WiFi)     │     │  - Preproceso    │     │ - Localización  │  │
-│  └─────────────┘     └──────────────────┘     └─────────────────┘  │
-│                                │                        │            │
-│                                ▼                        ▼            │
-│                      /camera/image_raw        /aruco/detections     │
+│  │   WiFi)     │     │  - Preproceso    │     │ - Homografía    │  │
+│  └─────────────┘     └──────────────────┘     │ - Poses ABS     │  │
+│                                │                └─────────────────┘  │
+│                                ▼                        │            │
+│                      /zenital/image_raw     /robot_pose (ABS)       │
+│                                             /blue_box_pose (ABS)    │
+│                                             /yellow_box_pose (ABS)  │
+│                                                                      │
+│  CLAVE: Coordenadas ABSOLUTAS del campo (cm)                        │
+│  - Origen: esquina sup-izq (ArUco 20)                               │
+│  - 4 ArUcos fijos (20,21,22,23) en esquinas                         │
+│  - Homografía recalculada cada 30 frames si están visibles          │
 └────────────────────────────────┬───────────────────┬────────────────┘
                                  │     ROS2 WiFi     │
                                  │    DDS Network    │
 ┌────────────────────────────────┴───────────────────┴────────────────┐
-│                    NIVEL DE DECISIÓN Y CONTROL                      │
-│                       (RASPBERRY PI 4)                              │
+│              NIVEL DE DECISIÓN Y CONTROL                            │
+│                   (RASPBERRY PI 4)                                  │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  ┌───────────────┐   ┌────────────────┐   ┌──────────────────┐    │
-│  │ Nodo Fusión   │──►│ Planificador   │──►│ Controlador      │    │
-│  │ Sensorial     │   │ de Trayectoria │   │ de Navegación    │    │
-│  │ - Localización│   │ - Pathfinding  │   │ - Control vel.   │    │
-│  │ - Odometría   │   │ - Estrategia   │   │ - Evasión        │    │
-│  └───────────────┘   └────────────────┘   └──────────────────┘    │
-│                                                      │               │
-│  ┌───────────────────────────────────────────────┐  │               │
-│  │        micro-ROS Agent                        │  │               │
-│  │  - Puente ROS2 ↔ micro-ROS                  │  │               │
-│  │  - Serial/WiFi con ESP32                     │  │               │
-│  └───────────────────────────────────────────────┘  │               │
-│                         │                            ▼               │
-│                         │                      /cmd_vel (Twist)     │
-└─────────────────────────┼──────────────────────────┬────────────────┘
-                          │   Serial/WiFi            │
-                          │   micro-ROS              │
-┌─────────────────────────┴──────────────────────────┴────────────────┐
-│                     NIVEL DE ACTUACIÓN                              │
-│                         (ESP32)                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │        micro-ROS Agent                                        │  │
+│  │  - Puente ROS2 ↔ micro-ROS                                  │  │
+│  │  - Serial/WiFi con ESP32                                    │  │
+│  │  - Relayea /cmd_vel_laptop → /cmd_vel                       │  │
+│  └────────────────────────┬────────────────────────────────────┘  │
+│                           │                                        │
+│                           ▼                                        │
+│                    /cmd_vel (Twist)                                │
+└─────────────────────────────┼────────────────────────────────────────┘
+                              │   Serial/WiFi
+                              │   micro-ROS
+┌─────────────────────────────┴───────────────────────────────────────┐
+│                    NIVEL DE ACTUACIÓN                               │
+│                        (ESP32)                                      │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌────────────────┐    ┌────────────────────┐   ┌───────────────┐  │
@@ -71,7 +80,7 @@ El sistema está diseñado con una **arquitectura distribuida** de tres niveles 
 │                                          │   Hardware Físico    │   │
 │                                          │ - 4 Motores Mecanum  │   │
 │                                          │ - 2 Puentes H        │   │
-│                                          │ - Encoders (futuro)  │   │
+│                                          │ - Encoders           │   │
 │                                          └──────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -156,47 +165,61 @@ El sistema está diseñado con una **arquitectura distribuida** de tres niveles 
 
 ### Portátil (Ubuntu 22.04 + ROS2 Humble)
 
-#### Paquete: `robot_vision`
+#### Paquete: `robot_localization` (NUEVO)
 
 **Nodos:**
-- `camera_capture_node`: Captura de stream de cámara IP
-- `aruco_detector_node`: Detección de marcadores ArUco
-- `object_detector_node`: Detección de elementos del juego (a implementar)
+- `camera_publisher` - Captura de stream de cámara IP
+- `field_localizer` - Detección de ArUcos + Homografía → Poses absolutas
+- `aruco_navigator` (futuro) - Navegación hacia objetivos en coordenadas del campo
 
 **Topics publicados:**
-- `/camera/image_raw` (sensor_msgs/Image)
-- `/camera/aruco_image` (sensor_msgs/Image) - Debug con markers dibujados
-- `/aruco/detections` (custom msg) - Lista de ArUcos detectados
+- `/roborescue/zenital/image_raw` (sensor_msgs/Image)
+- `/roborescue/zenital/image_raw/compressed` (CompressedImage) - **Recomendado para WiFi**
+- `/roborescue/zenital/debug` (sensor_msgs/Image) - Con anotaciones ArUco
+- `/roborescue/robot_pose` (geometry_msgs/Pose2D) - **Posición ABSOLUTA en cm + theta en grados**
+- `/roborescue/blue_box_pose` (geometry_msgs/Pose2D) - **Posición ABSOLUTA**
+- `/roborescue/yellow_box_pose` (geometry_msgs/Pose2D) - **Posición ABSOLUTA**
+
+**Parámetros:**
+- `robot_id` - ID del ArUco del robot (default: 1)
+- `blue_box_id` - ID de caja azul (default: 36)
+- `yellow_box_id` - ID de caja amarilla (default: 47)
+- `fixed_ids` - IDs de los 4 ArUcos fijos (default: [20, 21, 22, 23])
+- `field_width_cm` - Ancho del campo (default: 300)
+- `field_height_cm` - Alto del campo (default: 200)
+- `homography_update_every_n_frames` - Frecuencia de recalculación (default: 30)
 
 **Dependencias:**
-- OpenCV (cv2)
+- OpenCV (cv2) - Para detección de ArUcos y transformaciones perspectivas
 - cv_bridge
 - NumPy
 
 ---
 
-### Raspberry Pi 4 (Ubuntu 22.04 + ROS2 Humble)
+#### Paquete: `laptop_vision` (ANTERIOR - Referencia)
 
-#### Paquete: `robot_navigator`
-
-**Nodos:**
-- `state_estimator_node`: Fusión sensorial y estimación de estado
-- `path_planner_node`: Planificación de trayectorias
-- `navigation_controller_node`: Control de navegación
-- `eurobot_controller_node`: Controlador principal de estrategia
-
-**Topics subscritos:**
-- `/aruco/detections`
-- `/zenital/image_raw` (opcional)
+**Nodos:** (Sistema antiguo de visión relativa)
+- `camera_publisher` - Captura de cámara IP
+- `aruco_detector` - Detección con posiciones RELATIVAS al robot
+- `aruco_navigator` - Navegación basada en visión relativa
 
 **Topics publicados:**
-- `/cmd_vel` (geometry_msgs/Twist)
-- `/robot_state` (custom msg) - Estado actual del robot
-- `/debug/path` (nav_msgs/Path) - Trayectoria planificada
+- `/roborescue/robot_pose` (Pose2D) - Siempre (0, 0, 0) - referencia del robot
+- `/roborescue/blue_box_pose` (Pose2D) - Posición RELATIVA a robot
+- `/roborescue/yellow_box_pose` (Pose2D) - Posición RELATIVA a robot
 
-**Servicios:**
-- `/start_match` - Iniciar partido
-- `/emergency_stop` - Parada de emergencia
+---
+
+### Raspberry Pi 4 (Ubuntu 22.04 + ROS2 Humble)
+
+#### Paquete: `rpi_relay`
+
+**Nodos:**
+- `cmd_vel_relay` - Relay de comandos (reenvía `/cmd_vel_laptop` → `/cmd_vel`)
+
+**Topics:**
+- Suscribe: `/roborescue/cmd_vel_laptop` (Twist)
+- Publica: `/roborescue/cmd_vel` (Twist) - Para ESP32 vía micro-ROS
 
 #### Paquete: `micro_ros_agent`
 
@@ -204,7 +227,7 @@ El sistema está diseñado con una **arquitectura distribuida** de tres niveles 
 
 **Comando:**
 ```bash
-ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0
+ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
 ```
 
 ---
