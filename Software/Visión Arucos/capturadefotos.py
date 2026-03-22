@@ -5,7 +5,7 @@ import os
 # CONFIGURACIÓN
 # ----------------------------------------------
 # Índice de la cámara (0 para la primera webcam, 1 para la segunda, etc.)
-CAMARA_ID = 1
+CAMARA_ID = 0
 
 # Carpeta donde se guardarán las fotos
 CARPETA_DESTINO = "fotos_calibracion"
@@ -41,6 +41,10 @@ while True:
         print("❌ Error al leer la cámara")
         break
 
+    # Corregir distorsión
+    h, w = frame.shape[:2]
+    newcameramtx, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, dist_coeffs, (w,h), 1, (w,h))
+    frame = cv2.undistort(frame, camera_matrix, dist_coeffs, None, newcameramtx)
     # Mostrar el frame en una ventana
     cv2.imshow("Captura para calibración", frame)
 

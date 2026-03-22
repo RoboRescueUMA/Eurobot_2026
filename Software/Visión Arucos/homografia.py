@@ -4,7 +4,7 @@ import numpy as np
 # ------------------------------
 # CONFIGURACIÓN: CÁMARA (cambia la URL por la de tu móvil)
 # ------------------------------
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 # ------------------------------
 # CONFIGURACIÓN: ARUCO (API actualizada)
@@ -25,9 +25,9 @@ id_inf_der = 3
 # Posiciones reales en (X, Y) en cm (mídelas con cinta métrica)
 puntos_reales = np.array([
     [0, 0],      # sup_izq
-    [40, 0],     # sup_der
-    [0, 40],     # inf_izq
-    [40, 40]     # inf_der
+    [80, 0],     # sup_der
+    [0, 80],     # inf_izq
+    [80, 80]     # inf_der
 ], dtype=np.float32)
 
 homografia = None
