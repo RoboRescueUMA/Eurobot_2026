@@ -4,7 +4,7 @@ import numpy as np
 # ------------------------------
 # CONFIGURACIÓN: CÁMARA (cambia la URL por la de tu móvil)
 # ------------------------------
-cap = cv2.VideoCapture("http://192.168.1.131:8080/video")
+cap = cv2.VideoCapture(1)
 
 # ------------------------------
 # CONFIGURACIÓN: ARUCO (API actualizada)
