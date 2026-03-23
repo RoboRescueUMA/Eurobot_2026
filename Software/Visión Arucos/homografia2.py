@@ -1,133 +1,153 @@
 import cv2
 import numpy as np
 
-# ------------------------------
-# CONFIGURACIÓN
-# ------------------------------
-cap = cv2.VideoCapture(0)
+# ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
+cap = cv2.VideoCapture(1)
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 parameters = cv2.aruco.DetectorParameters()
-detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
+detector   = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
 camera_matrix = np.load("camera_matrix.npy")
 dist_coeffs   = np.load("dist_coeffs.npy")
 
 marker_size = 10.0  # cm
 
-# IDs de los marcadores del suelo
-id_sup_izq = 0
-id_sup_der = 1
-id_inf_izq = 2
-id_inf_der = 3
-
-# Coordenadas reales de los marcadores del suelo (en cm)
-puntos_suelo_3d = {
-    id_sup_izq: np.array([0.0,  0.0,  0.0]),
-    id_sup_der: np.array([80.0, 0.0,  0.0]),
-    id_inf_izq: np.array([0.0,  80.0, 0.0]),
-    id_inf_der: np.array([80.0, 80.0, 0.0]),
+# Marcadores del suelo: ID -> centro en mundo (X, Y, Z=0)
+GROUND_MARKERS_CENTERS = {
+    20: np.array([60.0,  140.0, 0.0]),
+    21: np.array([240.0, 140.0, 0.0]),
+    22: np.array([60.0,   60.0, 0.0]),
+    24: np.array([240.0,  60.0, 0.0]),
 }
 
-# ID del robot
-id_robot = 4
-h_robot = 36.0  # altura del marcador sobre el suelo
+ROBOT_ID = 4
+H_ROBOT  = 40.5   # altura del marcador del robot sobre el suelo (cm)
 
-R_wc = None
-t_wc = None
+R_cw = None
+t_cw = None
+camera_pose_locked = False # NUEVO: Para congelar la pose de la cámara
 
-print("Buscando marcadores del suelo para estimar la pose de la cámara...")
+# ── FUNCIONES ─────────────────────────────────────────────────────────────────
+
+def get_marker_corners_3d(center_3d, size):
+    """
+    Devuelve las 4 esquinas 3D de un marcador asumiendo que está en el suelo (Z=0)
+    y alineado con los ejes X e Y.
+    El orden de ArUco es: Top-Left, Top-Right, Bottom-Right, Bottom-Left.
+    """
+    cx, cy, cz = center_3d
+    hs = size / 2.0
+    return np.array([
+        [cx - hs, cy + hs, cz], # Top-Left
+        [cx + hs, cy + hs, cz], # Top-Right
+        [cx + hs, cy - hs, cz], # Bottom-Right
+        [cx - hs, cy - hs, cz]  # Bottom-Left
+    ], dtype=np.float64)
+
+def estimate_camera_pose(corners_list, ids_list):
+    """
+    Estima la pose de la cámara usando las 4 ESQUINAS de todos los marcadores.
+    """
+    obj_pts, img_pts = [], []
+    for i, mid in enumerate(ids_list):
+        if mid in GROUND_MARKERS_CENTERS:
+            # Puntos 2D en la imagen (las 4 esquinas)
+            corners_2d = corners_list[i][0] 
+            
+            # Puntos 3D en el mundo real (las 4 esquinas)
+            corners_3d = get_marker_corners_3d(GROUND_MARKERS_CENTERS[mid], marker_size)
+            
+            for j in range(4):
+                img_pts.append(corners_2d[j])
+                obj_pts.append(corners_3d[j])
+
+    # Necesitamos al menos 6 puntos para un PnP estable (1 marcador y medio)
+    if len(obj_pts) < 6:
+        return None, None
+
+    obj_arr = np.array(obj_pts, dtype=np.float64)
+    img_arr = np.array(img_pts, dtype=np.float64)
+
+    success, rvec, tvec = cv2.solvePnP(
+        obj_arr, img_arr,
+        camera_matrix, dist_coeffs,
+        flags=cv2.SOLVEPNP_SQPNP
+    )
+    
+    if not success:
+        return None, None
+
+    # Refinar con LM (muy recomendable)
+    rvec, tvec = cv2.solvePnPRefineLM(
+        obj_arr, img_arr, camera_matrix, dist_coeffs, rvec, tvec
+    )
+
+    R, _ = cv2.Rodrigues(rvec)
+    return R, tvec.reshape(3)
+
+# La función ray_plane_intersection se mantiene EXACTAMENTE IGUAL a la tuya.
+def ray_plane_intersection(pixel_uv, R_cw, t_cw, plane_z):
+    pt_norm = cv2.undistortPoints(
+        np.array([[[pixel_uv[0], pixel_uv[1]]]], dtype=np.float64),
+        camera_matrix, dist_coeffs
+    )[0][0]
+    ray_c = np.array([pt_norm[0], pt_norm[1], 1.0])
+    R_wc  = R_cw.T
+    ray_w = R_wc @ ray_c
+    C_w = -(R_wc @ t_cw)
+
+    if abs(ray_w[2]) < 1e-6: return None
+    s = (plane_z - C_w[2]) / ray_w[2]
+    if s < 0: return None
+    return C_w + s * ray_w
+
+# ── BUCLE PRINCIPAL ───────────────────────────────────────────────────────────
+print("Iniciando visión Eurobot…")
 
 while True:
     ret, frame = cap.read()
-    if not ret:
-        break
+    if not ret: break
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     corners, ids, _ = detector.detectMarkers(gray)
 
     if ids is not None:
-        ids = ids.flatten()
+        ids_flat = ids.flatten()
         cv2.aruco.drawDetectedMarkers(frame, corners, ids)
 
-        # ------------------------------
-        # 1) ESTIMAR POSE DE LA CÁMARA
-        # ------------------------------
-        if R_wc is None:
-            obj_pts = []
-            cam_pts = []
+        # ── 1) Actualizar pose de la cámara (SOLO SI NO ESTÁ BLOQUEADA) ──────
+        if not camera_pose_locked:
+            R_new, t_new = estimate_camera_pose(corners, ids_flat)
+            if R_new is not None:
+                R_cw, t_cw = R_new, t_new
+                # Podrías añadir un contador aquí para promediar 30 frames y luego:
+                # camera_pose_locked = True
+                # print("Cámara calibrada y bloqueada!")
 
-            for i, id_detectado in enumerate(ids):
-                if id_detectado in puntos_suelo_3d:
+        # ── 2) Localizar robot ────────────────────────────────────────────────
+        if R_cw is not None:
+            for i, mid in enumerate(ids_flat):
+                if mid == ROBOT_ID:
+                    center_px = corners[i][0].mean(axis=0)
 
-                    # Pose del marcador respecto a la cámara
-                    rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
-                        corners[i], marker_size, camera_matrix, dist_coeffs
-                    )
+                    pos_w = ray_plane_intersection(center_px, R_cw, t_cw, H_ROBOT)
 
-                    tvec = tvec[0][0]  # (Xc, Yc, Zc)
+                    if pos_w is not None:
+                        cx, cy = int(center_px[0]), int(center_px[1])
+                        label = f"X={pos_w[0]:.1f}  Y={pos_w[1]:.1f} cm"
+                        cv2.putText(frame, label, (cx - 60, cy - 20),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        cv2.circle(frame, (cx, cy), 6, (0, 255, 0), -1)
 
-                    cam_pts.append(tvec)
-                    obj_pts.append(puntos_suelo_3d[id_detectado])
-
-            if len(obj_pts) >= 3:
-                obj_pts = np.array(obj_pts, dtype=np.float32)
-                cam_pts = np.array(cam_pts, dtype=np.float32)
-
-                # Resolver transformación 3D-3D (suelo -> cámara)
-                # Usamos método de Umeyama (SVD)
-                centroid_obj = np.mean(obj_pts, axis=0)
-                centroid_cam = np.mean(cam_pts, axis=0)
-
-                X = obj_pts - centroid_obj
-                Y = cam_pts - centroid_cam
-
-                H = X.T @ Y
-                U, S, Vt = np.linalg.svd(H)
-                R_wc = Vt.T @ U.T
-
-                if np.linalg.det(R_wc) < 0:
-                    Vt[2, :] *= -1
-                    R_wc = Vt.T @ U.T
-
-                t_wc = centroid_cam.reshape(3,1) - R_wc @ centroid_obj.reshape(3,1)
-
-                print("Pose cámara (t_wc):", t_wc.T)
-                print("Altura estimada cámara:", t_wc[2, 0])
-
-        # ------------------------------
-        # 2) ESTIMAR POSE DEL ROBOT
-        # ------------------------------
-        if R_wc is not None:
-            R_cw = R_wc.T
-            t_cw = -R_cw @ t_wc
-
-            for i, id_detectado in enumerate(ids):
-                if id_detectado == id_robot:
-
-                    rvec_r, tvec_r, _ = cv2.aruco.estimatePoseSingleMarkers(
-                        corners[i], marker_size, camera_matrix, dist_coeffs
-                    )
-
-                    p_c = tvec_r[0][0].reshape(3, 1)
-
-                    # Transformar a coordenadas del suelo
-                    p_w = R_cw @ p_c + t_cw
-
-                    # Base del robot (restar altura)
-                    base_robot = p_w.copy()
-                    base_robot[2, 0] -= h_robot
-
-                    texto = f"Base robot: X={base_robot[0,0]:.1f}  Y={base_robot[1,0]:.1f}  Z={base_robot[2,0]:.1f}"
-                    centro_px = np.mean(corners[i][0], axis=0)
-
-                    cv2.putText(frame, texto,
-                                (int(centro_px[0]) - 50, int(centro_px[1]) - 20),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
-
-    cv2.imshow("Pose 3D estable", frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    cv2.imshow("Eurobot - Localizacion Robot", frame)
+    
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
         break
+    elif key == ord('l'): # Presiona 'L' para bloquear/desbloquear la pose
+        camera_pose_locked = not camera_pose_locked
+        print("Pose bloqueada:" if camera_pose_locked else "Pose desbloqueada", camera_pose_locked)
 
 cap.release()
 cv2.destroyAllWindows()
