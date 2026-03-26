@@ -1,315 +1,282 @@
 #!/usr/bin/env python3
 """
-go_to_xy.py — Nodo ROS 2 para mover el robot a unas coordenadas (x, y) dadas.
+GoToXY — Nodo ROS2 de navegación autónoma
+Adaptado a la arquitectura Eurobot 2026
+=========================================
+Suscribe a:
+  /roborescue/robot_pose  (geometry_msgs/Pose2D)
+      x, y  → coordenadas en CENTÍMETROS (sistema absoluto del campo)
+      theta → orientación en GRADOS (0° = eje X del campo)
 
-Arquitectura:
-  - Suscriptor: recibe la posición actual del robot desde la cámara cenital.
-  - Action server: acepta un objetivo (x, y) y ejecuta el movimiento.
-  - Publicador: envía comandos de velocidad a /cmd_vel (Twist).
+Publica en:
+  /roborescue/cmd_vel_laptop  (geometry_msgs/Twist)
+      La Raspberry Pi retransmite este tópico como /roborescue/cmd_vel hacia el ESP32.
+      Usa los tres campos: linear.x, linear.y (ruedas Mecanum), angular.z
 
-Control:
-  Controlador proporcional (P) de dos canales independientes:
-    · Velocidad lineal  → proporcional a la distancia al objetivo.
-    · Velocidad angular → proporcional al error de ángulo (heading).
-  Las ruedas omnidireccionales permiten combinar ambas simultáneamente,
-  por lo que no es necesario girar antes de avanzar.
+Recibe el objetivo mediante:
+  /roborescue/goal_pose  (geometry_msgs/Pose2D)
+      x, y en centímetros (mismas unidades que robot_pose)
 
-Interfaces ROS 2 utilizadas:
-  Suscripción : /robot_pose          [geometry_msgs/Pose2D]
-  Publicación : /cmd_vel             [geometry_msgs/Twist]
-  Action      : go_to_xy             [GoToXY — definido en este paquete]
-
-Uso desde línea de comandos (sin action client):
-  ros2 run <paquete> go_to_xy
-
-Uso enviando un goal desde otro nodo o terminal:
-  ros2 action send_goal /go_to_xy <paquete>/action/GoToXY \
-      "{target_x: 1.0, target_y: 0.5}"
+Uso desde terminal:
+  ros2 topic pub --once /roborescue/goal_pose geometry_msgs/msg/Pose2D \
+      "{x: 150.0, y: 80.0, theta: 0.0}"
 """
 
-import math
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from rclpy.callback_groups import ReentrantCallbackGroup
-
 from geometry_msgs.msg import Twist, Pose2D
+import math
 
-# ---------------------------------------------------------------------------
-# NOTA: Necesitas definir el action type GoToXY en tu paquete.
-# Crea el fichero action/GoToXY.action con este contenido:
+
+# ──────────────────────────────────────────────────────────
+#  Parámetros de control
 #
-#   # Goal
-#   float64 target_x
-#   float64 target_y
-#   ---
-#   # Result
-#   bool success
-#   string message
-#   ---
-#   # Feedback
-#   float64 distance_remaining
-#
-# Y añade en CMakeLists.txt / package.xml la generación de la acción.
-# ---------------------------------------------------------------------------
-from Ros2_RPI_ESP.action import GoToXY  # ← Cambia <tu_paquete> por tu paquete real
+#  NOTA SOBRE UNIDADES:
+#  Las poses llegan en centímetros. Las velocidades que publica
+#  este nodo son normalizadas [-1.0, 1.0]: el ESP32 las mapea
+#  a PWM internamente. No usamos m/s reales aquí.
+# ──────────────────────────────────────────────────────────
+
+# Ganancias proporcionales.
+# El error llega en cm, la salida es velocidad normalizada.
+# Con KP_LINEAR = 0.015: un error de 50 cm da salida 0.75 (bien dentro del rango)
+KP_LINEAR  = 0.015   # (velocidad normalizada) / cm
+KP_ANGULAR = 1.2     # (velocidad angular normalizada) / rad
+
+# Saturación de salida. El ESP32 espera valores en [-1.0, 1.0]
+MAX_LINEAR  = 1.0
+MAX_ANGULAR = 1.0
+
+# Tolerancias
+DIST_TOLERANCE  = 5.0    # cm — se considera "llegado" cuando dist < este valor
+ANGLE_TOLERANCE = 0.15   # rad (~8°) — umbral para corrección angular
+
+# Frecuencia del bucle de control
+CONTROL_HZ = 20
 
 
-# ===========================================================================
-# PARÁMETROS DE CONTROL — Ajusta estos valores según tu robot
-# ===========================================================================
+# ──────────────────────────────────────────────────────────
+#  Nodo principal
+# ──────────────────────────────────────────────────────────
 
-# Ganancia proporcional para velocidad lineal (m/s por metro de error)
-KP_LINEAR = 0.6
-
-# Ganancia proporcional para velocidad angular (rad/s por radián de error)
-KP_ANGULAR = 1.2
-
-# Velocidad lineal máxima permitida (m/s)
-MAX_LINEAR_VEL = 0.3
-
-# Velocidad angular máxima permitida (rad/s)
-MAX_ANGULAR_VEL = 1.0
-
-# Velocidad lineal mínima para evitar movimientos imperceptibles (m/s)
-MIN_LINEAR_VEL = 0.05
-
-# Distancia al objetivo por debajo de la cual se considera "llegado" (m)
-GOAL_TOLERANCE = 0.05  # 5 cm
-
-# Frecuencia del bucle de control (Hz)
-CONTROL_RATE_HZ = 20.0
-
-# Topic donde la cámara publica la posición del robot
-POSE_TOPIC = "/robot_pose"
-
-# Topic donde se publican los comandos de velocidad
-CMD_VEL_TOPIC = "/cmd_vel"
-
-# Nombre de la acción
-ACTION_NAME = "go_to_xy"
-
-
-# ===========================================================================
-# NODO PRINCIPAL
-# ===========================================================================
-
-class GoToXYNode(Node):
+class GoToXY(Node):
 
     def __init__(self):
-        super().__init__("go_to_xy")
+        super().__init__('go_to_xy')
 
-        # --- Posición actual del robot (actualizada por el suscriptor) ---
-        self.current_x: float = 0.0
-        self.current_y: float = 0.0
-        self.current_yaw: float = 0.0  # ángulo actual en radianes
-        self.pose_received: bool = False  # flag: ¿ya tenemos al menos un dato?
-
-        # --- Callback group compartido para acción + suscriptor ---
-        # ReentrantCallbackGroup permite que el execute() del action corra
-        # en paralelo con los callbacks del suscriptor.
-        cb_group = ReentrantCallbackGroup()
-
-        # --- Suscriptor a la posición del robot ---
-        # La cámara publica geometry_msgs/Pose2D con (x, y, theta).
-        # Si tu cámara publica otro tipo de mensaje, adapta este callback.
+        # --- Suscripción a la pose actual desde el localizador ArUco ---
+        # Publica el portátil tras aplicar la homografía.
+        # x, y en cm; theta en GRADOS.
         self.pose_sub = self.create_subscription(
             Pose2D,
-            POSE_TOPIC,
-            self._pose_callback,
-            10,
-            callback_group=cb_group,
+            '/roborescue/robot_pose',
+            self.pose_callback,
+            10
         )
 
-        # --- Publicador de comandos de velocidad ---
-        self.cmd_pub = self.create_publisher(Twist, CMD_VEL_TOPIC, 10)
-
-        # --- Action server ---
-        self._action_server = ActionServer(
-            self,
-            GoToXY,
-            ACTION_NAME,
-            execute_callback=self._execute_callback,
-            goal_callback=self._goal_callback,
-            cancel_callback=self._cancel_callback,
-            callback_group=cb_group,
+        # --- Suscripción al objetivo ---
+        self.goal_sub = self.create_subscription(
+            Pose2D,
+            '/roborescue/goal_pose',
+            self.goal_callback,
+            10
         )
+
+        # --- Publicador hacia la Raspberry Pi ---
+        # La RPi retransmite este tópico como /roborescue/cmd_vel hacia el ESP32
+        # a través del agente micro-ROS.
+        self.cmd_pub = self.create_publisher(
+            Twist,
+            '/roborescue/cmd_vel_laptop',
+            10
+        )
+
+        # --- Estado interno ---
+        self.current_x     = 0.0   # cm
+        self.current_y     = 0.0   # cm
+        self.current_theta = 0.0   # radianes (convertido al recibir)
+
+        self.goal_x = None         # cm
+        self.goal_y = None         # cm
+
+        self.pose_received = False
+        self._log_counter  = 0
+
+        # --- Timer del bucle de control ---
+        self.timer = self.create_timer(1.0 / CONTROL_HZ, self.control_loop)
 
         self.get_logger().info(
-            f"Nodo go_to_xy iniciado.\n"
-            f"  Escuchando pose en : {POSE_TOPIC}\n"
-            f"  Publicando cmd_vel : {CMD_VEL_TOPIC}\n"
-            f"  Tolerancia llegada : {GOAL_TOLERANCE} m"
+            'GoToXY (Eurobot 2026) iniciado.\n'
+            '  Pose:    /roborescue/robot_pose     (cm + grados)\n'
+            '  Salida:  /roborescue/cmd_vel_laptop\n'
+            '  Objetivo:/roborescue/goal_pose      (cm)'
         )
 
-    # -----------------------------------------------------------------------
-    # CALLBACKS DE POSICIÓN
-    # -----------------------------------------------------------------------
 
-    def _pose_callback(self, msg: Pose2D):
-        """Actualiza la posición actual del robot."""
-        self.current_x = msg.x
-        self.current_y = msg.y
-        self.current_yaw = msg.theta
+    # ──────────────────────────────────────────
+    #  Callback: pose actual del robot
+    # ──────────────────────────────────────────
+
+    def pose_callback(self, msg: Pose2D):
+        """
+        Recibe la pose publicada por el localizador ArUco del portátil.
+
+        CONVERSIÓN CRÍTICA:
+        El localizador publica theta en GRADOS.
+        Todo el cálculo de control necesita radianes, así que convertimos aquí
+        una sola vez y el resto del código trabaja siempre en radianes.
+        """
+        self.current_x     = msg.x
+        self.current_y     = msg.y
+        self.current_theta = math.radians(msg.theta)   # grados → radianes
         self.pose_received = True
 
-    # -----------------------------------------------------------------------
-    # CALLBACKS DEL ACTION SERVER
-    # -----------------------------------------------------------------------
 
-    def _goal_callback(self, goal_request):
-        """Acepta o rechaza un goal entrante."""
-        self.get_logger().info(
-            f"Goal recibido: ({goal_request.target_x:.3f}, {goal_request.target_y:.3f})"
-        )
-        return GoalResponse.ACCEPT
+    # ──────────────────────────────────────────
+    #  Callback: nuevo objetivo
+    # ──────────────────────────────────────────
 
-    def _cancel_callback(self, goal_handle):
-        """Acepta cancelaciones."""
-        self.get_logger().info("Cancelación solicitada.")
-        return CancelResponse.ACCEPT
-
-    async def _execute_callback(self, goal_handle):
+    def goal_callback(self, msg: Pose2D):
         """
-        Bucle principal de control.
-        Se ejecuta mientras el robot no llegue al objetivo o se cancele.
+        Activa cuando se publica un nuevo destino en /roborescue/goal_pose.
+        Las coordenadas deben estar en centímetros, igual que robot_pose.
         """
-        target_x = goal_handle.request.target_x
-        target_y = goal_handle.request.target_y
-
+        self.goal_x = msg.x
+        self.goal_y = msg.y
         self.get_logger().info(
-            f"Ejecutando movimiento hacia ({target_x:.3f}, {target_y:.3f})"
+            f'Nuevo objetivo: x={msg.x:.1f} cm, y={msg.y:.1f} cm'
         )
 
-        # Esperamos a tener datos de posición antes de empezar
+
+    # ──────────────────────────────────────────
+    #  Bucle de control principal (Mecanum)
+    # ──────────────────────────────────────────
+
+    def control_loop(self):
+        """
+        Controlador proporcional para ruedas Mecanum (X-Drive).
+
+        A diferencia de un robot diferencial, las ruedas Mecanum permiten
+        moverse en cualquier dirección sin reorientar el chasis. Por eso
+        calculamos vx, vy y wz SIMULTÁNEAMENTE en cada iteración,
+        sin la lógica de "girar primero, avanzar después".
+
+        El flujo es:
+          1. Calcular error en el sistema de coordenadas del MUNDO (dx, dy en cm)
+          2. Rotar ese error al sistema de coordenadas del ROBOT (usando theta)
+          3. Aplicar ganancia proporcional → vx, vy normalizados
+          4. Publicar Twist con los tres componentes
+        """
+
         if not self.pose_received:
-            self.get_logger().warn("Esperando primer dato de /robot_pose...")
-            rate = self.create_rate(10)
-            while not self.pose_received and rclpy.ok():
-                rate.sleep()
+            return
+        if self.goal_x is None or self.goal_y is None:
+            return
 
-        feedback_msg = GoToXY.Feedback()
-        rate = self.create_rate(CONTROL_RATE_HZ)
+        # ── 1. Error en el sistema del mundo ───────────────────────
 
-        # -------------------------------------------------------------------
-        # BUCLE DE CONTROL
-        # -------------------------------------------------------------------
-        while rclpy.ok():
+        dx_world = self.goal_x - self.current_x   # cm
+        dy_world = self.goal_y - self.current_y   # cm
+        dist     = math.sqrt(dx_world**2 + dy_world**2)   # cm
 
-            # 1. Comprobar cancelación
-            if goal_handle.is_cancel_requested:
-                self._stop_robot()
-                goal_handle.canceled()
-                self.get_logger().info("Goal cancelado. Robot detenido.")
-                return GoToXY.Result(success=False, message="Cancelado por el usuario.")
+        # ── Condición de parada ─────────────────────────────────────
 
-            # 2. Calcular error de posición
-            dx = target_x - self.current_x
-            dy = target_y - self.current_y
-            distance = math.hypot(dx, dy)
-
-            # 3. Comprobar si hemos llegado
-            if distance < GOAL_TOLERANCE:
-                self._stop_robot()
-                goal_handle.succeed()
-                self.get_logger().info(
-                    f"¡Objetivo alcanzado! Distancia residual: {distance:.4f} m"
-                )
-                return GoToXY.Result(success=True, message="Objetivo alcanzado.")
-
-            # 4. Calcular el ángulo hacia el objetivo
-            angle_to_goal = math.atan2(dy, dx)
-
-            # 5. Error angular (diferencia entre heading actual y dirección al goal)
-            angle_error = _normalize_angle(angle_to_goal - self.current_yaw)
-
-            # 6. Control proporcional
-            linear_vel = _clamp(
-                KP_LINEAR * distance,
-                MIN_LINEAR_VEL,
-                MAX_LINEAR_VEL,
+        if dist < DIST_TOLERANCE:
+            self.stop_robot()
+            self.get_logger().info(
+                f'Meta alcanzada. Error final: {dist:.1f} cm'
             )
-            angular_vel = _clamp(
-                KP_ANGULAR * angle_error,
-                -MAX_ANGULAR_VEL,
-                MAX_ANGULAR_VEL,
-            )
+            self.goal_x = None
+            self.goal_y = None
+            return
 
-            # 7. Publicar comando de velocidad
-            cmd = Twist()
-            cmd.linear.x = linear_vel     # avance hacia delante
-            cmd.angular.z = angular_vel   # giro sobre el eje Z
-            self.cmd_pub.publish(cmd)
+        # ── 2. Rotar el error al marco del robot ────────────────────
+        #
+        # El error (dx_world, dy_world) está en el sistema global del campo.
+        # Para que el ESP32 sepa qué ruedas mover, necesitamos ese error
+        # en el sistema LOCAL del robot (rotado por -theta).
+        #
+        # Rotación 2D inversa:
+        #   vx_robot =  dx_world · cos(θ) + dy_world · sin(θ)
+        #   vy_robot = -dx_world · sin(θ) + dy_world · cos(θ)
+        #
+        # Interpretación: vx es "cuánto está el objetivo hacia mi frente",
+        # vy es "cuánto está el objetivo hacia mi lado izquierdo".
 
-            # 8. Publicar feedback
-            feedback_msg.distance_remaining = distance
-            goal_handle.publish_feedback(feedback_msg)
+        cos_t = math.cos(self.current_theta)
+        sin_t = math.sin(self.current_theta)
 
+        vx_raw =  dx_world * cos_t + dy_world * sin_t
+        vy_raw = -dx_world * sin_t + dy_world * cos_t
+
+        # ── 3. Aplicar ganancia y saturar ──────────────────────────
+
+        vx = max(-MAX_LINEAR, min(MAX_LINEAR, KP_LINEAR * vx_raw))
+        vy = max(-MAX_LINEAR, min(MAX_LINEAR, KP_LINEAR * vy_raw))
+
+        # ── 4. Corrección angular (opcional) ───────────────────────
+        #
+        # Con wz = 0 el robot mantiene su orientación mientras navega,
+        # aprovechando al máximo el movimiento omnidireccional.
+        #
+        # Si necesitas que el robot apunte hacia el objetivo mientras avanza,
+        # descomenta estas líneas:
+        #
+        # angle_to_goal = math.atan2(dy_world, dx_world)
+        # angle_error   = self.normalize_angle(angle_to_goal - self.current_theta)
+        # wz = max(-MAX_ANGULAR, min(MAX_ANGULAR, KP_ANGULAR * angle_error))
+
+        wz = 0.0
+
+        # ── 5. Publicar Twist ───────────────────────────────────────
+
+        cmd = Twist()
+        cmd.linear.x  = vx   # avance/retroceso (aprovecha ruedas Mecanum)
+        cmd.linear.y  = vy   # desplazamiento lateral (NUEVO respecto a versión anterior)
+        cmd.angular.z = wz   # giro sobre el eje vertical
+
+        self.cmd_pub.publish(cmd)
+
+        # Log de debug cada 0.5 s (10 iteraciones a 20 Hz)
+        self._log_counter += 1
+        if self._log_counter % 10 == 0:
             self.get_logger().debug(
-                f"dist={distance:.3f}m  angle_err={math.degrees(angle_error):.1f}°  "
-                f"vlin={linear_vel:.3f}  vang={angular_vel:.3f}"
+                f'dist={dist:.1f}cm  vx={vx:.2f}  vy={vy:.2f}  wz={wz:.2f}'
             )
 
-            rate.sleep()
 
-        # Si rclpy deja de estar ok (shutdown)
-        self._stop_robot()
-        goal_handle.abort()
-        return GoToXY.Result(success=False, message="Nodo apagado durante la ejecución.")
+    # ──────────────────────────────────────────
+    #  Utilidades
+    # ──────────────────────────────────────────
 
-    # -----------------------------------------------------------------------
-    # UTILIDADES INTERNAS
-    # -----------------------------------------------------------------------
-
-    def _stop_robot(self):
-        """Publica un Twist vacío para detener el robot."""
+    def stop_robot(self):
+        """Publica Twist vacío → ESP32 entra en zona muerta → motores parados."""
         self.cmd_pub.publish(Twist())
-        self.get_logger().info("Robot detenido.")
+
+    @staticmethod
+    def normalize_angle(angle: float) -> float:
+        """Normaliza un ángulo al rango [-pi, pi]."""
+        while angle >  math.pi: angle -= 2.0 * math.pi
+        while angle < -math.pi: angle += 2.0 * math.pi
+        return angle
 
 
-# ===========================================================================
-# FUNCIONES DE UTILIDAD
-# ===========================================================================
-
-def _normalize_angle(angle: float) -> float:
-    """
-    Normaliza un ángulo al rango [-π, π].
-    Necesario para evitar giros de más de 180° cuando el error cruza ±π.
-    """
-    while angle > math.pi:
-        angle -= 2.0 * math.pi
-    while angle < -math.pi:
-        angle += 2.0 * math.pi
-    return angle
-
-
-def _clamp(value: float, min_val: float, max_val: float) -> float:
-    """Limita un valor entre [min_val, max_val]."""
-    return max(min_val, min(max_val, value))
-
-
-# ===========================================================================
-# ENTRY POINT
-# ===========================================================================
+# ──────────────────────────────────────────────────────────
+#  Punto de entrada
+# ──────────────────────────────────────────────────────────
 
 def main(args=None):
     rclpy.init(args=args)
-
-    node = GoToXYNode()
-
-    # MultiThreadedExecutor necesario para que el action server y el
-    # suscriptor corran en paralelo (el bucle de control es bloqueante).
-    executor = rclpy.executors.MultiThreadedExecutor()
-    executor.add_node(node)
-
+    node = GoToXY()
     try:
-        executor.spin()
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info('Nodo detenido por el usuario.')
+        node.stop_robot()
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
