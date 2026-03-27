@@ -5,7 +5,7 @@ import os
 # CONFIGURACIÓN
 # ----------------------------------------------
 CAMARA_ID = 1  # 0 o 1 según la webcam
-CARPETA_DESTINO = "fotos_calibracion"
+CARPETA_DESTINO = "fotos_calibracion2"
 ANCHO = 1920
 ALTO = 1080
 
