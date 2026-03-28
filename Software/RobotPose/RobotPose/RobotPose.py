@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""
-Nodo de odometría para robot omnidireccional de 4 ruedas.
-
-Suscripciones:
-  - /encoders      (std_msgs/Float32MultiArray): velocidades [v1, v2, v3, v4] en m/s
-  - /initial_pose  (geometry_msgs/Pose2D):       posición inicial (x, y, theta)
-
-Publicaciones:
-  - /pose2d        (geometry_msgs/Pose2D):        posición del robot (x, y, theta)
-
-Disposición de ruedas (vista superior):
-        FRENTE
-    v1 ┌────┐ v2
-       │    │
-    v4 └────┘ v3
-        ATRÁS
-"""
 
 import rclpy
 from rclpy.node import Node
