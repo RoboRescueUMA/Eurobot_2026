@@ -1,24 +1,48 @@
-- Logo de tu equipo. ✅
+# 🤖 Eurobot 2026
 
-- Imprimir el escenario. ⚠️ [Fecha límite: 30 de Enero]
+### 📚 Documentación, Recursos Oficiales y Presentación a los jueces (TD)
 
-- Videos de presentación del equipo y de la motivación que os ha llevado a participar en Eurobot Spain. ⚠️ [Fecha límite: 10 de Febrero]
+Documentación, normativa y recursos técnicos necesarios para el **diseño, desarrollo y homologación** del robot para la competición.
 
-- Inscripción de todos los miembros y firma de las autorizaciones de derechos de imagen. ⚠️ [Fecha límite: 10 de Febrero]
+---
 
-- Pago de la inscripción. ✅
+## 📂 Contenido del Paquete
 
-- Video y presentación (póster en Eurobot profes) de descripción técnica del robot para el jurado. ⚠️ [Fecha límite: 1 de Marzo]
+<table>
+  <thead>
+    <tr>
+      <th>📁 Archivo / Carpeta</th>
+      <th>📝 Descripción</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>📁 <b>Ficheros del cursor y del tablero</b></td>
+      <td>Archivos digitales del campo de juego (CAD, mallas o planos) y elementos interactivos.</td>
+    </tr>
+    <tr>
+      <td>📄 <b>Arena y puntuaciones</b></td>
+      <td>Define dimensiones oficiales del área de juego y sistema de puntuación por misión.</td>
+    </tr>
+    <tr>
+      <td>📄 <b>EurobotSenior_general</b></td>
+      <td>Reglamento general de la categoría Senior. 📌 <i>Lectura obligatoria</i>.</td>
+    </tr>
+    <tr>
+      <td>📄 <b>Guía de Arbitraje</b></td>
+      <td>Explica criterios de evaluación, decisiones arbitrales y posibles penalizaciones.</td>
+    </tr>
+    <tr>
+      <td>📄 <b>Guía de Homologación</b></td>
+      <td>Requisitos técnicos que debe cumplir el robot (seguridad, dimensiones, etc.).</td>
+    </tr>
+    <tr>
+      <td>📄 <b>Futura Presentación a los Jueces</b></td>
+      <td>Aqui se añadirá la presentación dada a los jueces durante la homologación. </td>
+    </tr>
+  </tbody>
+</table>
 
-**¡Crear tu robot! (Añado algunos subchecks para planificarnos mejor. Para completar esta parte deberíamos reunirnos y ver las cosas que hay que hacer y los plazos tranquilamente)**
+---
 
-- Robot montado (hardware listo, ya no se toca a no ser que sea necesario porque falle algún componente)  ⚠️ [Fecha límite: 20 de Febrero]
-- Software básico ⚠️ [Fecha límite: 15 de Marzo]
-- Pruebas en escenario impreso y mejora del software ⚠️ [Fecha límite: 15 de Abril]
-
-**Competición**
-
-- Homologar tu robot antes de comenzar la competición para confirmar que cumple la normativa de Eurobot. ⚠️ [Fecha límite: 1 de Marzo]
-- Realizar una presentación de 10 minutos ante un jurado del proyecto realizado para el diseño del robot (novel, junior y senior). ⚠️ [Fecha límite: 5 de Abril]
-- Participar en varias rondas clasificatorias (generalmente 4, aunque dependerá de la categoría y el número de equipos inscritos en cada una de ellas). Pasarán a las rondas finales (excepto novel) los equipos que hayan conseguido más puntos en estas rondas. ⚠️ [Fecha límite: 18 de Abril]
-- Los equipos clasificados (excepto novel) jugarán las rondas finales que se decidirán por enfrentamiento directo hasta llegar a la gran final. ⚠️ [Fecha límite: 18 de Abril]
+</div>
