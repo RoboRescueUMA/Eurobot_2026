@@ -21,8 +21,8 @@ GROUND_MARKERS_CENTERS = {
     24: np.array([240.0,  60.0, 0.0]),
 }
 
-ROBOT_ID = 2
-H_ROBOT  = 44.2   # altura del marcador del robot sobre el suelo (cm)
+ROBOT_ID = 4
+H_ROBOT  = 40.5   # altura del marcador del robot sobre el suelo (cm)
 
 R_cw = None
 t_cw = None

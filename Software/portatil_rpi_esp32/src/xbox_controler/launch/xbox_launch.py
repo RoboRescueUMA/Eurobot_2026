@@ -8,7 +8,7 @@ def generate_launch_description():
     config_filepath = os.path.join(
         get_package_share_directory('xbox_controler'),
         'config',
-        'xbox.yaml'
+        'teleop_twist_joy.yaml'
     )
 
     joy_node = Node(
@@ -18,14 +18,17 @@ def generate_launch_description():
         parameters=[{'deadzone': 0.1}]
     )
 
-    xbox_teleop_node = Node(
-        package='xbox_controler',
-        executable='xbox_teleop',
-        name='xbox_teleop',
-        parameters=[config_filepath]
+    teleop_node = Node(
+        package='teleop_twist_joy',
+        executable='teleop_node',
+        name='teleop_twist_joy',
+        parameters=[config_filepath],
+        remappings=[
+            ('cmd_vel', '/roborescue/cmd_vel')
+        ]
     )
 
     return LaunchDescription([
         joy_node,
-        xbox_teleop_node
+        teleop_node
     ])

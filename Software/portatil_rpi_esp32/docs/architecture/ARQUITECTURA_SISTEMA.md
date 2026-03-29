@@ -29,60 +29,60 @@ El sistema implementa **localización absoluta en el campo** mediante:
 │                        (PORTÁTIL)                                    │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  ┌─────────────┐     ┌──────────────────┐       ┌─────────────────┐  │
-│  │  Cámara IP  │────►│  Nodo OpenCV     │──────►│ Nodo Localiza   │  │
-│  │  (Ethernet/ │     │  - Captura       │       │ ArUco           │  │
-│  │   WiFi)     │     │  - Preproceso    │       │ - Homografía    │  │
-│  └─────────────┘     └──────────────────┘       │ - Poses ABS     │  │
+│  ┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐  │
+│  │  Cámara IP  │────►│  Nodo OpenCV     │────►│ Nodo Localiza   │  │
+│  │  (Ethernet/ │     │  - Captura       │     │ ArUco           │  │
+│  │   WiFi)     │     │  - Preproceso    │     │ - Homografía    │  │
+│  └─────────────┘     └──────────────────┘     │ - Poses ABS     │  │
 │                                │                └─────────────────┘  │
 │                                ▼                        │            │
-│                      /zenital/image_raw      /robot_pose (ABS)       │
-│                                              /blue_box_pose (ABS)    │
-│                                              /yellow_box_pose (ABS)  │
+│                      /zenital/image_raw     /robot_pose (ABS)       │
+│                                             /blue_box_pose (ABS)    │
+│                                             /yellow_box_pose (ABS)  │
 │                                                                      │
-│  CLAVE: Coordenadas ABSOLUTAS del campo (cm)                         │
-│  - Origen: esquina sup-izq (ArUco 20)                                │
-│  - 4 ArUcos fijos (20,21,22,23) en esquinas                          │
-│  - Homografía recalculada cada 30 frames si están visibles           │
-└────────────────────────────────┬───────────────────┬─────────────────┘
+│  CLAVE: Coordenadas ABSOLUTAS del campo (cm)                        │
+│  - Origen: esquina sup-izq (ArUco 20)                               │
+│  - 4 ArUcos fijos (20,21,22,23) en esquinas                         │
+│  - Homografía recalculada cada 30 frames si están visibles          │
+└────────────────────────────────┬───────────────────┬────────────────┘
                                  │     ROS2 WiFi     │
                                  │    DDS Network    │
 ┌────────────────────────────────┴───────────────────┴────────────────┐
 │              NIVEL DE DECISIÓN Y CONTROL                            │
 │                   (RASPBERRY PI 4)                                  │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │        micro-ROS Agent                                        │  │
-│  │  - Puente ROS2 ↔ micro-ROS                                    │  │
-│  │  - Serial/WiFi con ESP32                                      │  │
-│  │  - Relayea /cmd_vel_laptop → /cmd_vel                         │  │
-│  └────────────────────────┬──────────────────────────────────────┘  │
-│                           │                                         │
-│                           ▼                                         │
-│                    /cmd_vel (Twist)                                 │
-└─────────────────────────────┼───────────────────────────────────────┘
+│  │  - Puente ROS2 ↔ micro-ROS                                  │  │
+│  │  - Serial/WiFi con ESP32                                    │  │
+│  │  - Relayea /cmd_vel_laptop → /cmd_vel                       │  │
+│  └────────────────────────┬────────────────────────────────────┘  │
+│                           │                                        │
+│                           ▼                                        │
+│                    /cmd_vel (Twist)                                │
+└─────────────────────────────┼────────────────────────────────────────┘
                               │   Serial/WiFi
                               │   micro-ROS
 ┌─────────────────────────────┴───────────────────────────────────────┐
 │                    NIVEL DE ACTUACIÓN                               │
 │                        (ESP32)                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌────────────────┐    ┌────────────────────┐   ┌───────────────┐   │
-│  │ Nodo micro-ROS │───►│ Cinemática Inversa │──►│ Control PWM   │   │
-│  │ - Sub /cmd_vel │    │ Mecanum (X-Drive)  │   │ - 4 motores   │   │
-│  │ - Watchdog     │    │ - Cálculo ruedas   │   │ - 2 drivers H │   │
-│  └────────────────┘    └────────────────────┘   └───────┬───────┘   │
-│                                                         │           │
-│                                                         ▼           │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────────┐    ┌────────────────────┐   ┌───────────────┐  │
+│  │ Nodo micro-ROS │───►│ Cinemática Inversa │──►│ Control PWM   │  │
+│  │ - Sub /cmd_vel │    │ Mecanum (X-Drive)  │   │ - 4 motores   │  │
+│  │ - Watchdog     │    │ - Cálculo ruedas   │   │ - 2 drivers H │  │
+│  └────────────────┘    └────────────────────┘   └───────┬───────┘  │
+│                                                           │          │
+│                                                           ▼          │
 │                                          ┌──────────────────────┐   │
 │                                          │   Hardware Físico    │   │
 │                                          │ - 4 Motores Mecanum  │   │
 │                                          │ - 2 Puentes H        │   │
 │                                          │ - Encoders           │   │
 │                                          └──────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

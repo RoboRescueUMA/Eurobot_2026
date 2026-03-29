@@ -3,6 +3,7 @@ import os
 from glob import glob
 
 package_name = 'robot_localization'
+calibration_glob = glob(os.path.join(package_name, 'calibration', '*'))
 
 setup(
     name=package_name,
@@ -13,9 +14,13 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
+        (os.path.join('share', package_name, 'calibration'), calibration_glob),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
+    package_data={
+        package_name: ['calibration/*'] if calibration_glob else [],
+    },
     zip_safe=True,
     maintainer='RoboRescue',
     maintainer_email='team@roborescue.com',
@@ -26,6 +31,7 @@ setup(
         'console_scripts': [
             'camera_publisher = robot_localization.camera_publisher:main',
             'field_localizer = robot_localization.field_localizer:main',
+            'field_navigator = robot_localization.field_navigator:main',
         ],
     },
 )
