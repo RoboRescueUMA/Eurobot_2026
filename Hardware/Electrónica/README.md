@@ -10,7 +10,7 @@ El robot implementa una **arquitectura híbrida de procesamiento**, donde la int
 
 ### 🔹 Nivel Superior — Visión & Estrategia
 
-* **Raspberry Pi 5 (8GB)**
+* **Raspberry Pi**
 * Ejecuta:
 
   * Visión artificial
