@@ -128,7 +128,7 @@ A la hora de compilar - Lanzar Nav2 (SIM o REAL)
 ❗ Permisos del script
 ```bash
     #Si falla ejecución:
-    chmod +x mision_eurobot.py
+    chmod +x fsm.py
 ```
 ## <span style="font-size:24px;">📌 Notas importantes</span>
 
