@@ -1,6 +1,6 @@
 # <span style="font-size:32px;">🤖 RoboRescue – Nodo de Odometría 4WD (ROS 2)</span>
 
-![ROS2](https://img.shields.io/badge/ROS2-Foxy-blue) ![Python](https://img.shields.io/badge/Python-3.10-green)
+![ROS2](https://img.shields.io/badge/ROS2-Humble-blue) ![Python](https://img.shields.io/badge/Python-3.10-green)
 
 <p style="font-size:18px;">Este nodo estima la <strong>pose</strong> de nuestro robot omnidireccional de 4 ruedas en tiempo real usando las velocidades de los encoders y la cinemática directa.
 Solo necesita un frame de la camara --> No afecta el retardo de la cámara</p>
