@@ -46,7 +46,7 @@ const float rads_por_cuenta = (2.0f * PI) / (float)COUNTS_PER_REV;
 enum Motores { M_FL, M_FR, M_RL, M_RR };
 
 // ---> CAMBIA ESTA VARIABLE PARA ELEGIR QUÉ MOTOR ENSAYAR <---
-const Motores MOTOR_A_PROBAR = M_RR; 
+const Motores MOTOR_A_PROBAR = M_FL; 
 
 const int PWM_ESCALON = 150;     
 const unsigned long ventana_us = 40000;  //Tiempo de muestreo

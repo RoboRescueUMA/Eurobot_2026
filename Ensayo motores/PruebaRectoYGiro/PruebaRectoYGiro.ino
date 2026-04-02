@@ -5,8 +5,12 @@ portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 // ================================================================
 //  ZONA DE CONFIGURACIÓN DEL CHASIS Y CINEMÁTICA
 // ================================================================
-float Kp = 159.7; 
-float Ki = 1078;
+
+// Parámetros PID individuales por motor (Sintonizados para overshoot=1.5%, ts=0.52s)
+const float Kp_FL = 218.9; const float Ki_FL = 1488.0;
+const float Kp_FR = 129.4; const float Ki_FR = 1130.0;
+const float Kp_RL = 200.8; const float Ki_RL = 1435.0;
+const float Kp_RR = 159.7; const float Ki_RR = 1078.0;
 
 // Compensación de fricción
 const int base_FL = 89; const int base_FR = 47;
@@ -32,10 +36,14 @@ float ref_FL = 0.0, ref_FR = 0.0, ref_RL = 0.0, ref_RR = 0.0;
 #define RR_PWM 21
 #define RR_DIR 19
 
-#define FL_ENC_A 16; #define FL_ENC_B 17
-#define FR_ENC_A 26; #define FR_ENC_B 27
-#define RL_ENC_A 22; #define RL_ENC_B 23
-#define RR_ENC_A 34; #define RR_ENC_B 35
+#define FL_ENC_A 16
+#define FL_ENC_B 17
+#define FR_ENC_A 26
+#define FR_ENC_B 27
+#define RL_ENC_A 22
+#define RL_ENC_B 23
+#define RR_ENC_A 34
+#define RR_ENC_B 35
 
 const int freq = 1000;
 const int resolution = 8;
@@ -55,31 +63,31 @@ double errSum_FL = 0, errSum_FR = 0, errSum_RL = 0, errSum_RR = 0;
 bool ensayo_finalizado = false;
 
 // ================================================================
-//  INTERRUPCIONES (Igual que siempre)
+//  INTERRUPCIONES
 // ================================================================
-void IRAM_ATTR isr_FL_A() { (digitalRead(16) != digitalRead(17)) ? cont_FL-- : cont_FL++; }
-void IRAM_ATTR isr_FR_A() { (digitalRead(26) != digitalRead(27)) ? cont_FR-- : cont_FR++; }
-void IRAM_ATTR isr_RL_A() { (digitalRead(22) != digitalRead(23)) ? cont_RL-- : cont_RL++; }
-void IRAM_ATTR isr_RR_A() { (digitalRead(34) != digitalRead(35)) ? cont_RR-- : cont_RR++; }
-void IRAM_ATTR isr_FL_B() { (digitalRead(16) == digitalRead(17)) ? cont_FL-- : cont_FL++; }
-void IRAM_ATTR isr_FR_B() { (digitalRead(26) == digitalRead(27)) ? cont_FR-- : cont_FR++; }
-void IRAM_ATTR isr_RL_B() { (digitalRead(22) == digitalRead(23)) ? cont_RL-- : cont_RL++; }
-void IRAM_ATTR isr_RR_B() { (digitalRead(34) == digitalRead(35)) ? cont_RR-- : cont_RR++; }
+void IRAM_ATTR isr_FL_A() { (digitalRead(FL_ENC_A) != digitalRead(FL_ENC_B)) ? cont_FL-- : cont_FL++; }
+void IRAM_ATTR isr_FR_A() { (digitalRead(FR_ENC_A) != digitalRead(FR_ENC_B)) ? cont_FR-- : cont_FR++; }
+void IRAM_ATTR isr_RL_A() { (digitalRead(RL_ENC_A) != digitalRead(RL_ENC_B)) ? cont_RL-- : cont_RL++; }
+void IRAM_ATTR isr_RR_A() { (digitalRead(RR_ENC_A) != digitalRead(RR_ENC_B)) ? cont_RR-- : cont_RR++; }
+void IRAM_ATTR isr_FL_B() { (digitalRead(FL_ENC_A) == digitalRead(FL_ENC_B)) ? cont_FL-- : cont_FL++; }
+void IRAM_ATTR isr_FR_B() { (digitalRead(FR_ENC_A) == digitalRead(FR_ENC_B)) ? cont_FR-- : cont_FR++; }
+void IRAM_ATTR isr_RL_B() { (digitalRead(RL_ENC_A) == digitalRead(RL_ENC_B)) ? cont_RL-- : cont_RL++; }
+void IRAM_ATTR isr_RR_B() { (digitalRead(RR_ENC_A) == digitalRead(RR_ENC_B)) ? cont_RR-- : cont_RR++; }
 
 // ================================================================
-//  FUNCIÓN PID BIDIRECCIONAL 
+//  FUNCIÓN PID BIDIRECCIONAL (Ahora recibe Kp y Ki individuales)
 // ================================================================
-int calcular_pwm_rueda(float v_deseada, float v_actual, double &memoria_integral, int pwm_base_motor) {
+int calcular_pwm_rueda(float v_deseada, float v_actual, double &memoria_integral, int pwm_base_motor, float kp, float ki) {
   if (v_deseada == 0.0) { memoria_integral = 0; return 0; }
   double dt = (double)ventana_us / 1000000.0;
   double error = v_deseada - v_actual;
   memoria_integral += (error * dt);
 
-  double limite_integral = (255.0 - pwm_base_motor) / Ki; 
+  double limite_integral = (255.0 - pwm_base_motor) / ki; 
   if (memoria_integral > limite_integral) memoria_integral = limite_integral;
   else if (memoria_integral < -limite_integral) memoria_integral = -limite_integral;
 
-  double Output = (Kp * error) + (Ki * memoria_integral);
+  double Output = (kp * error) + (ki * memoria_integral);
   int pwm_final = 0;
   
   if (v_deseada > 0.0) {
@@ -96,12 +104,9 @@ int calcular_pwm_rueda(float v_deseada, float v_actual, double &memoria_integral
 }
 
 // ================================================================
-//  NUEVO: FUNCIÓN DE CINEMÁTICA MECANUM
+//  FUNCIÓN DE CINEMÁTICA MECANUM
 // ================================================================
 void calcular_cinematica(float Vx, float Vy, float W) {
-  // Ecuaciones universales de la rueda Mecanum
-  // Vx = Adelante(+)/Atras(-) | Vy = Derecha(+)/Izquierda(-) | W = Giro Antihorario(+)/Horario(-)
-  
   ref_FL = Vx + Vy - (W * K_GEOMETRIA);
   ref_FR = Vx - Vy + (W * K_GEOMETRIA);
   ref_RL = Vx - Vy - (W * K_GEOMETRIA);
@@ -117,22 +122,22 @@ void setup() {
 
   pinMode(FL_DIR, OUTPUT); pinMode(RL_DIR, OUTPUT);
   pinMode(FR_DIR, OUTPUT); pinMode(RR_DIR, OUTPUT);
-  pinMode(16, INPUT_PULLUP); pinMode(17, INPUT_PULLUP);
-  pinMode(26, INPUT_PULLUP); pinMode(27, INPUT_PULLUP);
-  pinMode(22, INPUT_PULLUP); pinMode(23, INPUT_PULLUP);
-  pinMode(34, INPUT_PULLUP); pinMode(35, INPUT_PULLUP);
+  pinMode(FL_ENC_A, INPUT_PULLUP); pinMode(FL_ENC_B, INPUT_PULLUP);
+  pinMode(FR_ENC_A, INPUT_PULLUP); pinMode(FR_ENC_B, INPUT_PULLUP);
+  pinMode(RL_ENC_A, INPUT_PULLUP); pinMode(RL_ENC_B, INPUT_PULLUP);
+  pinMode(RR_ENC_A, INPUT_PULLUP); pinMode(RR_ENC_B, INPUT_PULLUP);
 
   ledcAttach(FL_PWM, freq, resolution); ledcAttach(FR_PWM, freq, resolution);
   ledcAttach(RL_PWM, freq, resolution); ledcAttach(RR_PWM, freq, resolution);
 
-  attachInterrupt(digitalPinToInterrupt(16), isr_FL_A, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(17), isr_FL_B, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(26), isr_FR_A, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(27), isr_FR_B, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(22), isr_RL_A, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(23), isr_RL_B, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(34), isr_RR_A, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(35), isr_RR_B, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FL_ENC_A), isr_FL_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FL_ENC_B), isr_FL_B, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FR_ENC_A), isr_FR_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FR_ENC_B), isr_FR_B, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RL_ENC_A), isr_RL_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RL_ENC_B), isr_RL_B, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RR_ENC_A), isr_RR_A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RR_ENC_B), isr_RR_B, CHANGE);
 
   lastWindowUs = micros();
   t_inicio_prueba = millis(); 
@@ -153,43 +158,33 @@ void loop() {
     unsigned long ventana_real_us = ahora_us - lastWindowUs;
     lastWindowUs = ahora_us;
 
-    // 1. EL CEREBRO DE NAVEGACIÓN (Secuencia: Avance 0.1 -> Giro 90 -> Avance -> Giro 90 -> Lateral)
     unsigned long tiempo = millis() - t_inicio_prueba;
     
     float comando_Vx = 0.0;
     float comando_Vy = 0.0;
     float comando_W  = 0.0;
 
-    // --- SECUENCIA DE TIEMPOS (Ajustada con pausas de 1s para estabilidad) ---
-    
     if (tiempo < 3000) {
-      // 1. Avance lento (3 seg) a 0.1 m/s
       comando_Vx = 0.1; comando_Vy = 0.0; comando_W = 0.0;
     } 
     else if (tiempo >= 4000 && tiempo < 5570) {
-      // 2. Primer Giro 90º (1.57 seg) a 1.0 rad/s
       comando_Vx = 0.0; comando_Vy = 0.0; comando_W = 1.0;
     }
     else if (tiempo >= 6570 && tiempo < 8570) {
-      // 3. Avance corto (2 seg) a 0.1 m/s
       comando_Vx = 0.1; comando_Vy = 0.0; comando_W = 0.0;
     }
     else if (tiempo >= 9570 && tiempo < 11140) {
-      // 4. Segundo Giro 90º (1.57 seg) a 1.0 rad/s
       comando_Vx = 0.0; comando_Vy = 0.0; comando_W = 1.0;
     }
     else if (tiempo >= 12140 && tiempo < 12640) {
-      // 5. Toque lateral de precisión (0.5 seg) a 0.25 m/s (derecha)
       comando_Vx = 0.0; comando_Vy = 0.25; comando_W = 0.0;
     }
     else if (tiempo > 13500) {
       ensayo_finalizado = true;
     }
 
-    // Le pasamos las órdenes a la Cinemática y ella calcula las referencias (ref_FL, ref_FR...)
     calcular_cinematica(comando_Vx, comando_Vy, comando_W);
 
-    // 2. LEER ENCODERS
     portENTER_CRITICAL(&mux);
     long current_FL = cont_FL; long current_FR = cont_FR;
     long current_RL = cont_RL; long current_RR = cont_RR;
@@ -201,7 +196,6 @@ void loop() {
     prev_FL = current_FL; prev_FR = current_FR;
     prev_RL = current_RL; prev_RR = current_RR;
 
-    // 3. CALCULAR VELOCIDADES
     float rads_FL = -(((float)delta_FL * 1000000.0f) / (float)ventana_real_us) * rads_por_cuenta;
     float rads_FR = (((float)delta_FR * 1000000.0f) / (float)ventana_real_us) * rads_por_cuenta;
     float rads_RL = -(((float)delta_RL * 1000000.0f) / (float)ventana_real_us) * rads_por_cuenta;
@@ -210,13 +204,12 @@ void loop() {
     float v_FL = rads_FL * RADIO_RUEDA; float v_FR = rads_FR * RADIO_RUEDA;
     float v_RL = rads_RL * RADIO_RUEDA; float v_RR = rads_RR * RADIO_RUEDA;
 
-    // 4. APLICAR PID
-    int pwm_FL = calcular_pwm_rueda(ref_FL, v_FL, errSum_FL, base_FL);
-    int pwm_FR = calcular_pwm_rueda(ref_FR, v_FR, errSum_FR, base_FR);
-    int pwm_RL = calcular_pwm_rueda(ref_RL, v_RL, errSum_RL, base_RL);
-    int pwm_RR = calcular_pwm_rueda(ref_RR, v_RR, errSum_RR, base_RR);
+    // APLICAR PID CON PARÁMETROS INDIVIDUALES
+    int pwm_FL = calcular_pwm_rueda(ref_FL, v_FL, errSum_FL, base_FL, Kp_FL, Ki_FL);
+    int pwm_FR = calcular_pwm_rueda(ref_FR, v_FR, errSum_FR, base_FR, Kp_FR, Ki_FR);
+    int pwm_RL = calcular_pwm_rueda(ref_RL, v_RL, errSum_RL, base_RL, Kp_RL, Ki_RL);
+    int pwm_RR = calcular_pwm_rueda(ref_RR, v_RR, errSum_RR, base_RR, Kp_RR, Ki_RR);
 
-    // 5. ESCRIBIR PWM
     digitalWrite(FL_DIR, (pwm_FL >= 0) ? LOW : HIGH); ledcWrite(FL_PWM, abs(pwm_FL));
     digitalWrite(FR_DIR, (pwm_FR >= 0) ? HIGH : LOW); ledcWrite(FR_PWM, abs(pwm_FR));
     digitalWrite(RL_DIR, (pwm_RL >= 0) ? LOW : HIGH); ledcWrite(RL_PWM, abs(pwm_RL));
