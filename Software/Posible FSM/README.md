@@ -62,7 +62,7 @@ Se utilizan dos modos
 
 ## <span style="font-size:24px;">Nav2 </span>
 
-Esto se utilizaria especialmente para rodear las piezas y aparcar. Como nunca he usado Nav2 no se si funcionaría.
+Posiciona el robot DETRÁS de las piezas (robot orientado mirando la zona) además de ayudar a Aparcar. Como nunca he usado Nav2 no se si funcionaría.
 ```bash
 ir_a(x, y, theta)
 ```
@@ -71,7 +71,7 @@ ir_a(x, y, theta)
 - Cancela automáticamente si hay emergencia
 
 ## <span style="font-size:24px;"> Control directo (empuje) </span>
-
+cmd_vel a velocidad constante durante el tiempo necesario para cubrir la distancia hasta la zona  (d = v × t, sin odometría).
 Se utiliza para empujar las piezas y que el Nav2 no haga que el robot se raye, vaya tambaleando o pare. Tiene el peligro de acumular más error de la cuenta.
 ```bash
     empujar_ciego(distancia)
@@ -80,18 +80,28 @@ Se utiliza para empujar las piezas y que el Nav2 no haga que el robot se raye, v
 - Sin planificación
 - Velocidad constante
 - Independiente de Nav2
+- 
+## <span style="font-size:24px;"> 🗺️ Sistema de coordenadas del mapa </span>
+
+- Origen : esquina inferior derecha  (X_max, 0)
+- X      : crece hacia la izquierda   (AZUL   → X grande,  AMARILLO → X pequeña)
+- Y      : crece hacia arriba         (zona de entrega en Y alto)
+
+Convención de ángulos (theta_deg, referencia frame 'map'):
+- 90°  = mirando hacia Y+ (hacia la zona de entrega / arriba en imagen)
+- 270° = mirando hacia Y- (alejándose de la zona)
 
 
-## <span style="font-size:24px;"> FUNCIONES EXPERIMETNALES</span>
+## <span style="font-size:24px;"> 📷 Funciones experimentales</span>
 
-Esto tiene como objetivo mirar unicamente la posicion por cámara de vez en cuando (A la hora de Aparcar y empujar) para no acumular demasiado error.
+Esto tiene como objetivo mirar unicamente la posicion por cámara de vez en cuando (A la hora de Aparcar y alinearse para empujar las piezas) para no acumular demasiado error.
 La idea es que vacia el buffer de ROS2 para que la proxima posción que recibamos sea la más reciente.
-
+```bash
     obtener_pose_fresca()
-
+```
 - Ideado pero no implementado (Puesto como comentarios en el codigo)
 - Pensado para compensar el retardo de la cámara
-- Se deberia probar y revisar antes, ya que al ser una idea se la he pedido a Claude y no la he revisado xd
+- Se deberia probar y revisar antes, ya que al ser una idea se la he pedido a Claude y no la he revisado xd.
 
 ## <span style="font-size:24px;">🛑 Gestión de Fallos</span>
 Esto es un poco experimental también y habría que ver si no nos da problemas o es viable
@@ -104,7 +114,17 @@ Acción:
 - Activa emergencia
 - Va directamente a aparcar
 
-## <span style="font-size:24px;">Como usar el nodo</span>
+## <span style="font-size:24px;">📋 Cambios en el Nodo de Visión</span>  
+Se han añadido cosas para que el nodo sea compatible con Nav2.
+
+1. Integración con el sistema de transformadas (TF2)
+  - Añadido TransformBroadcaster: Se incorporó el emisor de transformadas de ROS2
+  - Generación de la TF map -> base_link: El nodo ahora no solo publica un mensaje de posición, sino que inserta al robot en el árbol de coordenadas global. Esto es esencial para que Nav2 sepa dónde está el robot en tiempo real.
+  - Conversión a Cuaterniones: Se añadió la función euler_to_quaternion para convertir el ángulo de orientación ($\theta$) al formato que requiere el estándar de ROS 2 (geometry_msgs/Quaternion).
+
+2. Cambio de las medidas de cm -> metros
+
+## <span style="font-size:24px;">❓Como usar el nodo</span>
 Instalar dependencias básicas
 ```bash
         sudo apt install python3-colcon-common-extensions
@@ -132,7 +152,6 @@ A la hora de compilar - Lanzar Nav2 (SIM o REAL)
 ```
 ## <span style="font-size:24px;">📌 Notas importantes</span>
 
-- Si queremos utilizar este nodo seria MUY IMPORTANTE poner todas las medidas de VISION ARUCOS en metros
 - No se si habría que hacer algo más para que se comunique con el nodo de microros
 - Es necesario ajustar a las medias reales del mapa (Donde están las piezas y eso)
 - En un futuro habrá que o borrar esta carpeta o hacer un README más serio porque me faltan cosas por decir seguro lol
