@@ -18,7 +18,7 @@ except ImportError:
 # ================================================================
 TIEMPO_TOTAL   = 100.0  # Segundos que dura la partida
 TIEMPO_RETORNO =  20.0  # Segundos restantes a los que abortamos y volvemos
-ZONA_ENTREGA_Y = 185.0  # Coordenada Y a partir de la cual la pieza está en el nido (cm)
+ZONA_ENTREGA_Y = 160.0  # Coordenada Y a partir de la cual la pieza está en el nido (cm)
 
 # ================================================================
 #  MÁQUINA DE ESTADOS
@@ -28,10 +28,11 @@ class EstadoRobot(Enum):
     CALCULAR_RUTAS = 1
     RODEAR_PIEZAS = 2
     POSICIONAR_DETRAS = 3
-    EMPUJAR_AL_NIDO = 4
-    EVALUAR_SIGUIENTE = 5
-    RETORNO_EMERGENCIA = 6
-    FIN_PARTIDA = 7
+    ENCARAR_NIDO = 4
+    EMPUJAR_AL_NIDO = 5
+    EVALUAR_SIGUIENTE = 6
+    RETORNO_EMERGENCIA = 7
+    FIN_PARTIDA = 8
 
 class CerebroEurobot(Node):
     def __init__(self):
@@ -58,9 +59,9 @@ class CerebroEurobot(Node):
             self.get_logger().warn("⚠️ Modo Simulación. Arranque automático en 3s...")
 
         # --- Subscriptores y Publicadores ---
-        self.sub_robot = self.create_subscription(Pose2D, "/roborescue/robot_pose", self.robot_callback, 10)
-        self.pub_cmd = self.create_publisher(Twist, "/roborescue/cmd_vel", 10)
-        self.pub_est = self.create_publisher(String, "/roborescue/robot_estado", 10)
+        self.sub_robot = self.create_subscription(Pose2D, "/roborescue/robot_pose", self.robot_callback, 1)
+        self.pub_cmd = self.create_publisher(Twist, "/roborescue/cmd_vel_laptop", 1)
+        self.pub_est = self.create_publisher(String, "/roborescue/robot_estado", 1)
         
         # --- Timers (El latido del programa) ---
         self.timer_fsm = self.create_timer(0.05, self.maquina_de_estados_loop) # 20 Hz para movimiento
@@ -127,23 +128,37 @@ class CerebroEurobot(Node):
         else: # EQUIPO AMARILLO (Espejo manual)
             self.rutas_mision = [
                 # Misión 1: Primer grupo de piezas
-                {"rodeo_x": 40.0,  "rodeo_y": 10.0,  # Punto para esquivarlas por la izquierda
-                 "pos_x": 65.0,    "pos_y": 50.0},   # Posición exacta detrás de ellas
+                {"rodeo_x": 55.0,  "rodeo_y": 80.0,  # Punto para esquivarlas por la izquierda
+                 "pos_x": 12.0,    "pos_y": 75.0,
+                 "final_x": 12.0,  "final_y": 160.0},  # Posición exacta detrás de ellas
                 
                 # Misión 2: Segundo grupo de piezas
                 {"rodeo_x": 15.0,  "rodeo_y": 10.0,  
-                 "pos_x": 35.0,    "pos_y": 20.0}    
+                 "pos_x": 35.0,    "pos_y": 20.0,
+                 "final_x": 12.0,  "final_y": 160.0}    
             ]
-            self.park_x = 20.0
-            self.park_y = 20.0
+            self.park_x = 12.0
+            self.park_y = 160.0
 
     # ================================================================
     #  HERRAMIENTAS DE MOVIMIENTO ROBUSTO (Modo Tanque)
     # ================================================================
+    def normalizar_angulo(self, angulo):
+        while angulo > 180:
+            angulo -= 360.0
+        while angulo < -180.0:
+            angulo += angulo
+        return angulo
+    
     def girar_absoluto(self, target_theta, tolerancia=5.0):
         """Rota sobre sí mismo. Devuelve True si ha terminado."""
         if self.robot_pose is None: return False
-        error_theta = (target_theta - self.robot_pose.theta + 180) % 360 - 180
+        
+        error_theta = target_theta - self.robot_pose.theta
+
+        error_theta = self.normalizar_angulo(error_theta)
+
+
         if abs(error_theta) < tolerancia:
             self.parar_motores()
             return True
@@ -170,7 +185,7 @@ class CerebroEurobot(Node):
         direccion = 1.0 if error_local_x > 0 else -1.0
 
         # Avanza con control proporcional (traduce distancia en cm a m/s)
-        vx = direccion * max(0.1, min(0.35, abs(0.02 * distancia)))
+        vx = direccion * max(0.08, min(0.1, abs(0.02 * distancia)))
         self.enviar_velocidad(vx=vx, vy=0.0, w=0.0)
         return False
 
@@ -233,12 +248,15 @@ class CerebroEurobot(Node):
             mision = self.rutas_mision[self.mision_actual]
             # Vamos detrás de las piezas
             if self.ir_a_punto_como_tanque(mision["pos_x"], mision["pos_y"]):
-                # Una vez detrás, giramos forzosamente hacia el Norte (90 grados, hacia el nido)
-                if self.girar_absoluto(90.0):
-                    self.get_logger().info("Alineación a 90º completada. ¡INICIANDO EMPUJE CERRADO!")
-                    self.estado_actual = EstadoRobot.EMPUJAR_AL_NIDO
+                    self.estado_actual = EstadoRobot.ENCARAR_NIDO
 
-        # 4. EMPUJE CONTINUO CONTROLADO POR CÁMARA
+        # 4. POSICIONAR HACIA LAS CAJAS Y GIRAR HACIA EL NIDO
+        elif self.estado_actual == EstadoRobot.ENCARAR_NIDO:
+            if self.girar_absoluto(90.0):
+                self.get_logger().info("Alineación a 90º completada. ¡INICIANDO EMPUJE CERRADO!")
+                self.estado_actual = EstadoRobot.EMPUJAR_AL_NIDO
+
+        # 5. EMPUJE CONTINUO CONTROLADO POR CÁMARA
         elif self.estado_actual == EstadoRobot.EMPUJAR_AL_NIDO:
             # Empujamos recto manteniendo el Norte hasta cruzar la ZONA_ENTREGA_Y
             if self.robot_pose.y >= ZONA_ENTREGA_Y:
@@ -247,9 +265,10 @@ class CerebroEurobot(Node):
                 self.estado_actual = EstadoRobot.EVALUAR_SIGUIENTE
             else:
                 # Mantenemos W=0 para forzar empuje totalmente recto.
-                self.enviar_velocidad(vx=0.25, vy=0.0, w=0.0)
+                mision = self.rutas_mision[self.mision_actual]
+                self.ir_a_punto_como_tanque(mision["final_x"], mision["final_y"])
 
-        # 5. PASAR AL SIGUIENTE GRUPO
+        # 6. PASAR AL SIGUIENTE GRUPO
         elif self.estado_actual == EstadoRobot.EVALUAR_SIGUIENTE:
             self.mision_actual += 1
             if self.mision_actual < len(self.rutas_mision):
@@ -259,7 +278,7 @@ class CerebroEurobot(Node):
                 self.get_logger().info("Misiones completadas antes de tiempo. Volviendo a base.")
                 self.estado_actual = EstadoRobot.RETORNO_EMERGENCIA
 
-        # 6. RETORNO DE EMERGENCIA / FIN DE LA LISTA
+        # 7. RETORNO DE EMERGENCIA / FIN DE LA LISTA
         elif self.estado_actual == EstadoRobot.RETORNO_EMERGENCIA:
             if self.ir_a_punto_como_tanque(self.park_x, self.park_y):
                 self.get_logger().info("Robot aparcado de forma segura.")

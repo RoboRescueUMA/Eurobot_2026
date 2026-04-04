@@ -7,7 +7,7 @@ Flujo:
   2. Suscribe a {target}_pose (blue_box_pose o yellow_box_pose)
   3. Calcula vector error en marco del mundo
   4. Transforma al marco del robot usando robot_theta
-  5. Control P de posicion -> velocidades (m/s)
+  5. Control PI de posicion -> velocidades (m/s)
   6. Publica cmd_vel_laptop
 
 Sistema de coordenadas:
@@ -20,6 +20,7 @@ Ejecuta en: LAPTOP
 
 import rclpy
 from rclpy.node import Node
+from rclpy.exceptions import ParameterAlreadyDeclaredException
 import math
 import time
 from geometry_msgs.msg import Pose2D, Twist
@@ -33,7 +34,12 @@ class FieldNavigator(Node):
         self.declare_parameter("target", "yellow_box")
         self.declare_parameter("goal_tolerance", 0.20)
         self.declare_parameter("kp_position", 0.8)
-        self.declare_parameter("max_linear_speed", 0.8)
+        self._declare_param_once("ki_position", 0.1)
+        self._declare_param_once("use_angular_control", False)
+        self._declare_param_once("kp_angular", 2.0)
+        self._declare_param_once("max_angular_speed", 1.5)
+        self._declare_param_once("angle_tolerance_deg", 15.0)
+        self.declare_parameter("max_linear_speed", 0.6)
         self.declare_parameter("min_linear_speed", 0.0)
         self.declare_parameter("detection_timeout", 1.0)
         self.declare_parameter("deceleration_zone", 0.50)
@@ -45,12 +51,27 @@ class FieldNavigator(Node):
             "250,77;284,77;278,157",
         )
         self.declare_parameter("preclear_tolerance_cm", 10.0)
+        self._declare_param_once("preclear_min_speed", 0.4)
+        self._declare_param_once("ki_preclear", 0.05)
 
         self.target = self.get_parameter("target").get_parameter_value().string_value
         self.goal_tolerance = (
             self.get_parameter("goal_tolerance").get_parameter_value().double_value
         )
         self.kp = self.get_parameter("kp_position").get_parameter_value().double_value
+        self.ki = self.get_parameter("ki_position").get_parameter_value().double_value
+        self.use_angular_control = (
+            self.get_parameter("use_angular_control").get_parameter_value().bool_value
+        )
+        self.kp_angular = (
+            self.get_parameter("kp_angular").get_parameter_value().double_value
+        )
+        self.max_angular_speed = (
+            self.get_parameter("max_angular_speed").get_parameter_value().double_value
+        )
+        self.angle_tolerance_deg = (
+            self.get_parameter("angle_tolerance_deg").get_parameter_value().double_value
+        )
         self.max_speed = (
             self.get_parameter("max_linear_speed").get_parameter_value().double_value
         )
@@ -80,6 +101,12 @@ class FieldNavigator(Node):
             .double_value
         )
         self.preclear_tolerance_m = self.preclear_tolerance_cm / 100.0
+        self.preclear_min_speed = (
+            self.get_parameter("preclear_min_speed").get_parameter_value().double_value
+        )
+        self.ki_preclear = (
+            self.get_parameter("ki_preclear").get_parameter_value().double_value
+        )
         self.preclear_waypoints = self._parse_waypoints(preclear_str)
         if not self.preclear_waypoints:
             self.preclear_enabled = False
@@ -87,6 +114,9 @@ class FieldNavigator(Node):
         self.preclear_done = not self.preclear_enabled
         self.log_throttle_interval = 2.0
         self._log_timestamps = {"robot": 0.0, "target": 0.0, "status": 0.0}
+        self.integral_x = 0.0
+        self.integral_y = 0.0
+        self.control_dt = 0.05
 
         # --- Validar target ---
         if self.target not in ["blue_box", "yellow_box"]:
@@ -122,8 +152,9 @@ class FieldNavigator(Node):
         self.get_logger().info(
             f"FieldNavigator listo. Target: {self.target}, "
             f"Tolerancia: {self.goal_tolerance * 100:.0f}cm, "
-            f"Kp: {self.kp}, MaxSpeed: {self.max_speed}m/s, "
-            f"MinSpeed: {self.min_speed}m/s"
+            f"Kp: {self.kp}, Ki: {self.ki}, "
+            f"MaxSpeed: {self.max_speed}m/s, MinSpeed: {self.min_speed}m/s, "
+            f"AngularControl: {self.use_angular_control}"
         )
         if self.preclear_enabled:
             self.get_logger().info(
@@ -189,8 +220,10 @@ class FieldNavigator(Node):
 
         if using_preclear and distancia_m < self.preclear_tolerance_m:
             self.send_stop()
+            self.integral_x = 0.0
+            self.integral_y = 0.0
             self.get_logger().info(
-                f"Waypoint {self.preclear_index + 1}/{len(self.preclear_waypoints)}"
+                f"Waypoint {self.preclear_index + 1}/{len(self.preclear_waypoints)} "
                 f" alcanzado ({target_x:.0f},{target_y:.0f})cm"
             )
             self.preclear_index += 1
@@ -219,6 +252,37 @@ class FieldNavigator(Node):
         vx = self.kp * error_x_robot
         vy = self.kp * error_y_robot
 
+        ki_use = self.ki_preclear if using_preclear else self.ki
+        if not using_preclear:
+            self.integral_x = 0.0
+            self.integral_y = 0.0
+        else:
+            self.integral_x += error_x_robot * self.control_dt
+            self.integral_y += error_y_robot * self.control_dt
+            self.integral_x = max(-1.0, min(1.0, self.integral_x))
+            self.integral_y = max(-1.0, min(1.0, self.integral_y))
+            vx += ki_use * self.integral_x
+            vy += ki_use * self.integral_y
+
+        if self.use_angular_control:
+            target_angle_rad = math.atan2(error_y_world, error_x_world)
+            robot_angle_rad = math.radians(robot_theta_deg)
+            angle_error_rad = target_angle_rad - robot_angle_rad
+            angle_error_rad = math.atan2(
+                math.sin(angle_error_rad), math.cos(angle_error_rad)
+            )
+            angle_error_deg = math.degrees(angle_error_rad)
+
+            wz = self.kp_angular * angle_error_rad
+            if abs(wz) > self.max_angular_speed:
+                wz = self.max_angular_speed * (1 if wz > 0 else -1)
+
+            aligned = abs(angle_error_deg) < self.angle_tolerance_deg
+        else:
+            wz = 0.0
+            angle_error_deg = 0.0
+            aligned = True
+
         if distancia_m < self.decel_zone:
             factor = distancia_m / self.decel_zone
             factor = max(0.5, factor)
@@ -226,27 +290,37 @@ class FieldNavigator(Node):
             vy *= factor
 
         speed = math.sqrt(vx**2 + vy**2)
-        if speed > self.max_speed and speed > 1e-6:
-            scale = self.max_speed / speed
+        max_speed = self.max_speed
+        min_speed = self.min_speed
+        if using_preclear:
+            min_speed = min(self.preclear_min_speed, min_speed)
+
+        if not aligned:
+            vx *= 0.3
+            vy *= 0.3
+
+        if speed > max_speed and speed > 1e-6:
+            scale = max_speed / speed
             vx *= scale
             vy *= scale
-            speed = self.max_speed
-        elif speed < self.min_speed and speed > 1e-6:
-            scale = self.min_speed / speed
+            speed = max_speed
+        elif speed < min_speed and speed > 1e-6:
+            scale = min_speed / speed
             vx *= scale
             vy *= scale
-            speed = self.min_speed
+            speed = min_speed
 
         cmd = Twist()
         cmd.linear.x = vx
         cmd.linear.y = vy
-        cmd.angular.z = 0.0
+        cmd.angular.z = wz
         self.pub_cmd.publish(cmd)
         self._throttled_info(
             "status",
             f"Navegando: dist={distancia_m * 100:.0f}cm | "
             f"error=({error_x_world:.0f},{error_y_world:.0f})cm | "
-            f"cmd=({vx:.2f},{vy:.2f})m/s",
+            f"angle_err={angle_error_deg:.1f}deg | "
+            f"cmd=({vx:.2f},{vy:.2f})m/s {wz:.2f}rad/s",
         )
 
     def _throttled_info(self, key, message):
@@ -279,6 +353,12 @@ class FieldNavigator(Node):
                     f"Waypoint '{chunk}' inválido. Formato esperado x,y"
                 )
         return waypoints
+
+    def _declare_param_once(self, name, default_value):
+        try:
+            self.declare_parameter(name, default_value)
+        except ParameterAlreadyDeclaredException:
+            pass
 
 
 def main(args=None):

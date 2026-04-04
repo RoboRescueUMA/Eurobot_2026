@@ -32,21 +32,9 @@ def generate_launch_description():
             ),
             Node(
                 package="robot_localization",
-                executable="field_navigator",
-                name="field_navigator",
+                executable="cerebro_eurobot",
+                name="cerebro_eurobot",
                 namespace="/roborescue",
-                parameters=[
-                    {
-                        "target": "yellow_box",
-                        "goal_tolerance": 0.20,
-                        "max_linear_speed": 0.53,
-                        "min_linear_speed": 0.5,
-                        "preclear_enabled": True,
-                        "preclear_waypoints": "250,77;284,77;278,157",
-                        "preclear_tolerance_cm": 10.0,
-                        "command_topic": "/roborescue/cmd_vel_laptop",
-                    }
-                ],
                 output="screen",
             ),
         ]

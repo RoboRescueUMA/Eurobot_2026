@@ -283,7 +283,7 @@ class FieldLocalizer(Node):
         self.sub_image = self.create_subscription(
             Image, "zenital/image_raw", self.image_callback, 1
         )
-        self.timer = self.create_timer(0.033, self.loop_callback)
+        self.timer = self.create_timer(0.01, self.loop_callback)
         self.pub_debug = self.create_publisher(Image, "zenital/debug", 1)
         self.pub_robot = self.create_publisher(Pose2D, "robot_pose", 1)
         self.pub_caja_azul = self.create_publisher(Pose2D, "blue_box_pose", 1)

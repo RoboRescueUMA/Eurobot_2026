@@ -32,6 +32,8 @@ setup(
             'camera_publisher = robot_localization.camera_publisher:main',
             'field_localizer = robot_localization.field_localizer:main',
             'field_navigator = robot_localization.field_navigator:main',
+            'cerebro_eurobot = robot_localization.cerebro_eurobot:main',
+            
         ],
     },
 )
