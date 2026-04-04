@@ -235,13 +235,12 @@ void subscription_callback(const void * msgin) {
   // MODO DEBUG: Activar solo un motor a la vez
   // Descomentar UNA línea para probar cada motor individualmente
   
-  set_motor(ch_FL, FL_DIR, x, false, "FL", &pwm_FL);  // Probar FL solo
+  // set_motor(ch_FL, FL_DIR, x, false, "FL", &pwm_FL);  // Probar FL solo
   // set_motor(ch_FR, FR_DIR, x, false, "FR", &pwm_FR);  // Probar FR solo
   // set_motor(ch_RL, RL_DIR, x, false, "RL", &pwm_RL);  // Probar RL solo
   // set_motor(ch_RR, RR_DIR, x, false, "RR", &pwm_RR);  // Probar RR solo
   
-  // Cinemática X-Drive con z invertido (DESACTIVADA EN MODO DEBUG)
-  /*
+  // Cinemática X-Drive con z invertido
   float fl = -(x - y + z);  // Front Left
   float fr = x + y - z;  // Front Right
   float rl = -(x + y + z);  // Rear Left
@@ -271,12 +270,8 @@ void subscription_callback(const void * msgin) {
   //   last_callback_print = now;
   // }
 
-  // Enviar comandos a motores y guardar PWM actual
-  set_motor(ch_FL, FL_DIR, fl, false, "FL", &pwm_FL);
-  set_motor(ch_FR, FR_DIR, fr, false, "FR", &pwm_FR);
-  set_motor(ch_RL, RL_DIR, rl, false, "RL", &pwm_RL);
-  set_motor(ch_RR, RR_DIR, rr, false, "RR", &pwm_RR);
-  */
+  // NOTA: Los comandos se aplican en el loop(), no aquí
+  // Esto evita llamar a set_motor() desde un callback ISR
 }
 
 void setup() {
@@ -385,9 +380,9 @@ void setup() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray),
     "encoder_velocities");
   
-  // Publisher para debug (8 floats: 4 target_rpm + 4 actual_rpm)
-  debug_msg.data.capacity = 8;
-  debug_msg.data.size = 8;
+  // Publisher para debug (12 floats: targets, actuales, PWM)
+  debug_msg.data.capacity = 12;
+  debug_msg.data.size = 12;
   debug_msg.data.data = (float*) malloc(debug_msg.data.capacity * sizeof(float));
   
   rclc_publisher_init_default(
@@ -507,7 +502,7 @@ void update_encoder_velocities() {
     
     rcl_publish(&publisher_encoder_vel, &encoder_msg, NULL);
     
-    // Debug: [target_FL, target_FR, target_RL, target_RR, actual_FL, actual_FR, actual_RL, actual_RR] en m/s
+    // Debug: [targets m/s, actuales m/s, PWM] para diagnóstico remoto
     debug_msg.data.data[0] = target_ms_FL;
     debug_msg.data.data[1] = target_ms_FR;
     debug_msg.data.data[2] = target_ms_RL;
@@ -516,6 +511,10 @@ void update_encoder_velocities() {
     debug_msg.data.data[5] = vel_ms_FR;
     debug_msg.data.data[6] = vel_ms_RL;
     debug_msg.data.data[7] = vel_ms_RR;
+    debug_msg.data.data[8] = pwm_FL;
+    debug_msg.data.data[9] = pwm_FR;
+    debug_msg.data.data[10] = pwm_RL;
+    debug_msg.data.data[11] = pwm_RR;
     
     rcl_publish(&publisher_debug, &debug_msg, NULL);
     
