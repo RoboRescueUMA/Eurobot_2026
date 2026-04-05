@@ -33,6 +33,7 @@ setup(
             'field_localizer = robot_localization.field_localizer:main',
             'field_navigator = robot_localization.field_navigator:main',
             'cerebro_eurobot = robot_localization.cerebro_eurobot:main',
+            'controlador_garra = robot_localization.controlador_garra:main',
             
         ],
     },
