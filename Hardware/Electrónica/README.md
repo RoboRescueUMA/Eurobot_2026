@@ -48,8 +48,7 @@ El robot implementa una **arquitectura híbrida de procesamiento**, donde la int
 | 3    | Driver Puente H DRI0002 | 2        | Control de motores DC          |
 | 4    | Motor DC + Encoder      | 4        | Tracción y odometría           |
 | 5    | Regulador LM2596      | 1        | Conversión 12V → 5V            |
-| 6–8  | Servomotores            | 3        | Garra y mecanismo de elevación |
-FT5335M, HS-331, sg90 |
+| 6–8  | Servomotores            | 3        | FT5335M, HS-331, sg90 |
 | 10   | Seta de emergencia      | 1        | Parada inmediata del sistema   |
 
 ---
