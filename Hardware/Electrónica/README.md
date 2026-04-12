@@ -47,8 +47,9 @@ El robot implementa una **arquitectura híbrida de procesamiento**, donde la int
 | 2    | Raspberry Pi 5          | 1        | Visión y lógica de misión      |
 | 3    | Driver Puente H DRI0002 | 2        | Control de motores DC          |
 | 4    | Motor DC + Encoder      | 4        | Tracción y odometría           |
-| 5    | Regulador S13V30F5      | 1        | Conversión 12V → 5V            |
-| 6–8  | Servomotores            | 3        | Garra y mecanismo de elevación |
+| 5    | Regulador LM2596      | 1        | Conversión 12V → 5V            |
+| 6–8  | Servomotores            | 3        | Garra y mecanismo de elevación
+FT5335M, HS-331, sg90 |
 | 10   | Seta de emergencia      | 1        | Parada inmediata del sistema   |
 
 ---
@@ -87,12 +88,23 @@ El diseño se ha realizado en **KiCad 9.0.6**.
 
 ### 🦾 Manipulación (Servos)
 
-| Pin ESP32 | Función | Elemento                   |
+| Pin Raspberry | Nombre GPIO |Elemento                   |
 | --------- | ------- | -------------------------- |
-| ND        | PWM     | Servo Garra                |
-| ND        | PWM     | Servo Giro Palma           |
-| ND        | PWM     | Servo Elevación            |
+| 12       | GPIO 18     | Servo 1              |
+| 32        | GPIO 12     | Servo 2           |
+| 33        | GPIO 13     | Servo 3            |
+| 14 (o cualquier GND) | Ground | Tierra
 | No Usado  | Input   | Encoder Feedback Elevación |
+| ND.       | ND.     | Microswitch detección piezas|
+
+---
+
+## 🏁 Arranque (microswitch)
+
+| Pines Raspberry | 
+| -----------  |
+| ND      |
+| GND     |
 
 ---
 
